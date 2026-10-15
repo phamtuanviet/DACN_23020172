@@ -1191,13 +1191,18 @@ Production chạy trên một máy chủ ứng dụng bằng Docker Compose, đ�
 # Hai môi trường chỉ khác nhau ở file trong /etc/dacn trên từng máy chủ:
 #   deploy.env, app.env, web.env, alloy.env  ← chép từ deploy/env/<môi trường>/ (không chứa secret)
 #   secrets/*                                ← ghi từ GitHub Environments (secret)
+# Tên miền chỉ khai báo một lần (SITE_DOMAIN trong deploy.env); APP_ENV do workflow điền theo tên
+# môi trường. Hai giá trị này được truyền xuống service ở đây, không lặp lại trong file env khác.
 # Không chạy tay: dùng deploy.sh.
 
 x-app: &app
   image: ${IMAGE_REPO}-backend:${RELEASE}
   env_file: /etc/dacn/app.env
-  environment:
+  environment: &runtime-env
+    APP_ENV: ${APP_ENV}
+    PUBLIC_BASE_URL: https://${SITE_DOMAIN}
     RELEASE: ${RELEASE}
+  labels: { dacn.secrets-hash: "${SECRETS_HASH_APP:-}" }   # secret đổi → tạo lại container (deploy.sh)
   secrets: [ database_url, jwt_keys, llm_api_key, smtp_user, smtp_password, valkey_url, sentry_dsn ]
   user: "10001:10001"
   read_only: true
@@ -1216,8 +1221,7 @@ x-api: &api
 x-web: &web
   image: ${IMAGE_REPO}-frontend:${RELEASE}
   env_file: /etc/dacn/web.env
-  environment:
-    RELEASE: ${RELEASE}
+  environment: *runtime-env
   user: "10001:10001"
   read_only: true
   tmpfs: [ /tmp, /app/.next/cache ]
@@ -1233,6 +1237,7 @@ services:
     ports: [ "80:80", "443:443" ]
     environment:
       SITE_DOMAIN: ${SITE_DOMAIN}
+    labels: { dacn.secrets-hash: "${SECRETS_HASH_CADDY:-}" }
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - next_static:/srv/next-static:ro
@@ -1264,6 +1269,7 @@ services:
     image: valkey/valkey:8.1.10
     command: [ "valkey-server", "/run/secrets/valkey_conf" ]   # requirepass, maxmemory, không lưu xuống đĩa
     user: "10001:10001"
+    labels: { dacn.secrets-hash: "${SECRETS_HASH_VALKEY:-}" }
     secrets: [ valkey_conf ]
     restart: unless-stopped
     networks: [ internal ]
@@ -1272,6 +1278,9 @@ services:
     image: grafana/alloy:v1.20.1
     command: [ "run", "/etc/alloy/config.alloy", "--storage.path=/var/lib/alloy" ]
     env_file: /etc/dacn/alloy.env
+    environment:
+      APP_ENV: ${APP_ENV}
+    labels: { dacn.secrets-hash: "${SECRETS_HASH_ALLOY:-}" }
     volumes:
       - ./alloy:/etc/alloy:ro
       - /var/log/journal:/var/log/journal:ro
@@ -1378,11 +1387,14 @@ networks:
 
 | Loại | Gồm | Lưu ở |
 | --- | --- | --- |
-| Secret | `database_url` (role `app_runtime`, `sslmode=verify-full`), `database_migrator_url`, `jwt_keys` (khóa ký hiện tại + khóa cũ), `llm_api_key`, `smtp_user` và `smtp_password` (thông tin SMTP của SES), `valkey_url` và `valkey_conf` (sinh từ một secret `VALKEY_PASSWORD`), `sentry_dsn`, `grafana_cloud_token`, chứng chỉ origin | GitHub Environments (`staging`, `production`) → file trong `/etc/dacn/secrets/`, chỉ root và user chạy container đọc được |
-| Cấu hình | `APP_ENV`, `PUBLIC_BASE_URL`, `CLINIC_TZ`, `CLINIC_PHONE`; tham số nghiệp vụ `BOOKING_WINDOW_DAYS=30`, `CHANGE_DEADLINE_HOURS=2`, `MAX_ACTIVE_APPOINTMENTS=3`, `PROPOSAL_TTL_MIN=10`, `AGENT_DAILY_MESSAGE_LIMIT=50`, `REMINDER_HOURS_BEFORE=24`; `LLM_PROVIDER`, `LLM_MODEL`, `LLM_FALLBACK_MODEL`, `LLM_TIMEOUT_S=30`, `LLM_DAILY_BUDGET_USD`; `SMTP_HOST`, `SMTP_PORT=587`, `MAIL_FROM`; `CHAT_RETENTION_DAYS=365` | Biến của GitHub Environments → `/etc/dacn/app.env` |
+| Secret | `database_url` (role `app_runtime`, `sslmode=verify-full`), `database_migrator_url`, `jwt_keys` (khóa ký hiện tại + khóa cũ), `llm_api_key`, `smtp_user` và `smtp_password` (thông tin SMTP của SES), `valkey_url` và `valkey_conf` (sinh từ một secret `VALKEY_PASSWORD`), `sentry_dsn`, `grafana_cloud_token`, chứng chỉ origin | GitHub Environments (`staging`, `production`) → file trong `/etc/dacn/secrets/`, chỉ root và user chạy container đọc được; danh sách ở `deploy/secrets.conf` |
+| Cấu hình | `CLINIC_TZ`, `CLINIC_PHONE`; tham số nghiệp vụ `BOOKING_WINDOW_DAYS=30`, `CHANGE_DEADLINE_HOURS=2`, `MAX_ACTIVE_APPOINTMENTS=3`, `PROPOSAL_TTL_MIN=10`, `AGENT_DAILY_MESSAGE_LIMIT=50`, `REMINDER_HOURS_BEFORE=24`; `LLM_PROVIDER`, `LLM_MODEL`, `LLM_FALLBACK_MODEL`, `LLM_TIMEOUT_S=30`, `LLM_DAILY_BUDGET_USD`; `SMTP_HOST`, `SMTP_PORT=587`, `MAIL_FROM`; `CHAT_RETENTION_DAYS=365` | `deploy/env/<môi trường>/app.env` trong repo, sửa qua pull request → `/etc/dacn/app.env` |
+| Suy ra | `APP_ENV` theo tên môi trường của workflow; `PUBLIC_BASE_URL` = `https://` + `SITE_DOMAIN` (`deploy.env`, nơi duy nhất khai báo tên miền) | `compose.prod.yaml` truyền xuống mọi service |
 
 - Secret không bao giờ nằm trong repo, image, tham số dòng lệnh hay log; gitleaks trên CI chặn commit lộ khóa (NFR-05). `.env.example` chỉ dùng cho dev.
-- Xoay secret: JWT thêm khóa mới làm khóa ký và giữ khóa cũ để xác minh thêm 30 phút; mật khẩu database, khóa LLM, thông tin SES thì tạo giá trị mới → cập nhật GitHub Environments → deploy → thu hồi giá trị cũ.
+- Thứ tự ưu tiên khi trùng tên: file secret → biến môi trường → giá trị mặc định, nên dòng trùng tên trong `deploy/env/*.env` không đè được secret. CI (`deploy/secrets.sh lint`) chặn tên secret và giá trị suy ra xuất hiện trong `deploy/env/`, và đối chiếu `deploy/secrets.conf` với mục `secrets` của `compose.prod.yaml`.
+- Workflow deploy kiểm tra đủ secret và variable theo `deploy/secrets.conf` trước khi chạm vào máy chủ; thiếu hoặc sai định dạng thì dừng và nêu tên từng key. Người vận hành nhập và đổi giá trị bằng `make secrets`, `make secret` (gọi GitHub CLI), không cần chép giá trị ra máy cá nhân.
+- Xoay secret: JWT thêm khóa mới làm khóa ký và giữ khóa cũ để xác minh thêm 30 phút; mật khẩu database, khóa LLM, thông tin SES thì tạo giá trị mới → cập nhật GitHub Environments (`make secret`) → deploy → thu hồi giá trị cũ. `deploy.sh` gắn mã băm các file secret của mỗi service vào label, nên lần deploy đó chỉ tạo lại những container dùng secret đã đổi (kể cả khi deploy lại cùng bản phát hành).
 
 ### 11.5 CI/CD và quy trình phát hành
 
@@ -1403,8 +1415,8 @@ flowchart LR
 
 GitHub Actions SSH vào VM bằng user `deploy` (chỉ đăng nhập bằng khóa SSH dành riêng cho CI) và chạy `deploy/deploy.sh <RELEASE>`:
 
-1. Ghi secret và `app.env` của môi trường tương ứng vào `/etc/dacn/`.
-2. `docker compose pull` các image của `RELEASE`.
+1. Kiểm tra đủ secret và variable theo `deploy/secrets.conf` (thiếu thì dừng tại đây), rồi ghi secret và file cấu hình của môi trường tương ứng vào `/etc/dacn/`.
+2. `docker compose pull` các image của `RELEASE`; service nào có secret đổi thì được tạo lại ở các bước sau (mã băm secret gắn vào label).
 3. Chép `.next/static` của bản mới vào volume `next_static` (cộng dồn với bản cũ; file không còn được bản nào dùng tới bị xóa sau 14 ngày).
 4. `docker compose run --rm migrate` bằng role `app_migrator`. Lỗi thì dừng tại đây — production vẫn chạy bản cũ nguyên vẹn.
 5. Thay `backend_a`, đợi `/health/ready` đạt rồi mới thay `backend_b`. Trong lúc một replica khởi động lại, Caddy chuyển request sang replica còn lại; Uvicorn dừng êm trong 40 giây để luồng chat đang chạy (tối đa 30 giây) kết thúc. Người dùng không thấy gián đoạn.
@@ -1412,7 +1424,7 @@ GitHub Actions SSH vào VM bằng user `deploy` (chỉ đăng nhập bằng khó
 7. Thay `worker`.
 8. Chạy smoke test, ghi `RELEASE` đang chạy vào `/etc/dacn/current_release`.
 
-Rollback là chạy lại `deploy.sh` với tag trước và bỏ qua bước migrate; nhờ quy tắc expand/contract (mục 7.3), schema mới vẫn chạy được với code cũ. Giao diện cũ vẫn dùng được với API mới vì mọi thay đổi trong `/api/v1` đều phải tương thích ngược.
+Rollback là chạy lại `deploy.sh` với tag trước và bỏ qua bước migrate (`make rollback env=<môi trường> release=<sha>`); nhờ quy tắc expand/contract (mục 7.3), schema mới vẫn chạy được với code cũ. Giao diện cũ vẫn dùng được với API mới vì mọi thay đổi trong `/api/v1` đều phải tương thích ngược.
 
 ### 11.6 Môi trường dev (`compose.yaml`)
 
@@ -1466,6 +1478,7 @@ Danh sách trên là đáp ứng về mặt kỹ thuật; nghĩa vụ pháp lý 
 - [ ] Amazon SES: tên miền đã xác thực SPF, DKIM, DMARC; tài khoản đã ra khỏi chế độ sandbox.
 - [ ] PostgreSQL managed: PITR bật, extension `btree_gist` và `unaccent` có sẵn, hai role `app_migrator` và `app_runtime`, chỉ truy cập qua mạng riêng.
 - [ ] Toàn bộ secret nằm trong GitHub Environments; không còn secret nào trên máy cá nhân hay trong repo.
+- [ ] `make secrets-status env=production` báo đủ giá trị bắt buộc; environment `production` có người duyệt và chỉ deploy từ `main`.
 - [ ] Sentry, Grafana Cloud, dịch vụ uptime và kênh nhận cảnh báo đã cấu hình và thử bắn cảnh báo.
 - [ ] Đã diễn tập khôi phục thành công trên staging, có ghi thời gian.
 - [ ] k6 trên staging đạt NFR-01, NFR-02; test đặt lịch đồng thời đạt AC-03.

@@ -61,8 +61,13 @@ cd frontend && npm ci && npm run dev
 | --- | --- |
 | `make dev` / `make down` | Bật / tắt môi trường development |
 | `make test` | Test backend (pytest) và frontend (Vitest) |
-| `make lint` | ruff + mypy, ESLint + TypeScript |
+| `make lint` | ruff + mypy, ESLint + TypeScript, kiểm tra cấu hình deploy |
 | `make fmt` | Tự định dạng mã |
 | `make migration m="..."` / `make migrate` | Tạo / chạy migration |
 | `make seed` | Nạp dữ liệu giả (bị chặn ở production) |
 | `make api-types` | Xuất OpenAPI từ backend và sinh kiểu TypeScript cho frontend |
+| `make secrets env=staging` / `make secrets-status env=staging` | Nhập secret/variable còn thiếu / chỉ xem (GitHub Environments) |
+| `make secret env=staging name=LLM_API_KEY` | Đổi một secret/variable |
+| `make deploy env=staging [release=<sha>]` / `make rollback env=production release=<sha>` | Deploy lại / quay về bản cũ |
+
+Chi tiết deploy, secret và cấu hình từng môi trường: [deploy/README.md](deploy/README.md).
