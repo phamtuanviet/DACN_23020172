@@ -76,6 +76,15 @@ jobs:
       - name: Lỗ hổng thư viện npm (phụ thuộc chạy thật)
         run: npm audit --omit=dev --audit-level=high
 
+  deploy-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Cấu hình deploy nhất quán (secret không lọt vào file env, staging và production đủ key như nhau)
+        run: deploy/secrets.sh lint
+      - name: Kiểm tra script shell
+        run: shellcheck deploy/*.sh
+
   secrets:
     runs-on: ubuntu-latest
     steps:

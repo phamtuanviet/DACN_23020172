@@ -1,5 +1,5 @@
 # Các bước deploy MỘT môi trường; deploy.yml gọi cho staging, production và khi chạy tay.
-# Biến (vars) và secret khai báo riêng trong từng GitHub Environment — danh sách ở deploy/README.md.
+# Biến (vars) và secret khai báo riêng trong từng GitHub Environment — danh sách ở deploy/secrets.conf.
 name: Deploy environment
 
 on:
@@ -33,6 +33,13 @@ jobs:
         with:
           ref: ${{ inputs.release }}
 
+      # Dừng ngay, nêu tên từng key thiếu hoặc sai, trước khi chạm vào máy chủ.
+      - name: Kiểm tra đủ secret và variable (deploy/secrets.conf)
+        env:
+          SECRETS_JSON: ${{ toJSON(secrets) }}
+          VARS_JSON: ${{ toJSON(vars) }}
+        run: deploy/secrets.sh preflight "$ENVIRONMENT"
+
       - name: Địa chỉ công khai (suy ra từ SITE_DOMAIN trong deploy.env)
         id: site
         run: echo "url=https://$(sed -n 's/^SITE_DOMAIN=//p' "deploy/env/$ENVIRONMENT/deploy.env")" >> "$GITHUB_OUTPUT"
@@ -56,38 +63,10 @@ jobs:
           scp /tmp/deploy.env "deploy/env/$ENVIRONMENT/app.env" "deploy/env/$ENVIRONMENT/web.env" \
             "deploy/env/$ENVIRONMENT/alloy.env" "$TARGET:/etc/dacn/"
 
-      - name: Ghi secret
+      - name: Ghi secret thành file trên máy chủ (danh sách ở deploy/secrets.conf)
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DATABASE_MIGRATOR_URL: ${{ secrets.DATABASE_MIGRATOR_URL }}
-          JWT_KEYS: ${{ secrets.JWT_KEYS }}
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-          VALKEY_PASSWORD: ${{ secrets.VALKEY_PASSWORD }}
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          GRAFANA_CLOUD_TOKEN: ${{ secrets.GRAFANA_CLOUD_TOKEN }}
-          ORIGIN_CERT: ${{ secrets.ORIGIN_CERT }}
-          ORIGIN_KEY: ${{ secrets.ORIGIN_KEY }}
-        run: |
-          # shellcheck disable=SC2029  # cố ý: tên file mở rộng ở runner rồi gửi sang máy chủ
-          # Ghi nguyên tử; nhóm dacn (gid 10001, user chạy container) đọc được, người khác không.
-          put() {
-            printf '%s' "$2" | ssh "$TARGET" "umask 027 && cat > /etc/dacn/secrets/$1.tmp \
-              && chgrp dacn /etc/dacn/secrets/$1.tmp && mv /etc/dacn/secrets/$1.tmp /etc/dacn/secrets/$1"
-          }
-          put database_url "$DATABASE_URL"
-          put database_migrator_url "$DATABASE_MIGRATOR_URL"
-          put jwt_keys "$JWT_KEYS"
-          put llm_api_key "$LLM_API_KEY"
-          put smtp_user "$SMTP_USER"
-          put smtp_password "$SMTP_PASSWORD"
-          put sentry_dsn "$SENTRY_DSN"
-          put grafana_cloud_token "$GRAFANA_CLOUD_TOKEN"
-          put origin_cert "$ORIGIN_CERT"
-          put origin_key "$ORIGIN_KEY"
-          put valkey_url "redis://:$VALKEY_PASSWORD@valkey:6379/0"
-          put valkey_conf "$(printf 'requirepass %s\nsave ""\nappendonly no\nmaxmemory 128mb\nmaxmemory-policy allkeys-lru\n' "$VALKEY_PASSWORD")"
+          SECRETS_JSON: ${{ toJSON(secrets) }}
+        run: deploy/secrets.sh upload "$ENVIRONMENT"
 
       - name: Đăng nhập GHCR trên máy chủ (token tự hết hạn khi job kết thúc)
         env:
