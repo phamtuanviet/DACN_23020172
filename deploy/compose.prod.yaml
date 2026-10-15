@@ -2,12 +2,16 @@
 # Hai môi trường chỉ khác nhau ở file trong /etc/dacn trên từng máy chủ:
 #   deploy.env, app.env, web.env, alloy.env  ← chép từ deploy/env/<môi trường>/ (không chứa secret)
 #   secrets/*                                ← ghi từ GitHub Environments (secret)
+# Tên miền chỉ khai báo một lần (SITE_DOMAIN trong deploy.env); APP_ENV do workflow điền theo tên
+# môi trường. Hai giá trị này được truyền xuống service ở đây, không lặp lại trong file env khác.
 # Không chạy tay: dùng deploy.sh.
 
 x-app: &app
   image: ${IMAGE_REPO}-backend:${RELEASE}
   env_file: /etc/dacn/app.env
-  environment:
+  environment: &runtime-env
+    APP_ENV: ${APP_ENV}
+    PUBLIC_BASE_URL: https://${SITE_DOMAIN}
     RELEASE: ${RELEASE}
   labels: { dacn.secrets-hash: "${SECRETS_HASH_APP:-}" }   # secret đổi → tạo lại container (deploy.sh)
   secrets: [ database_url, jwt_keys, llm_api_key, smtp_user, smtp_password, valkey_url, sentry_dsn ]
@@ -28,8 +32,7 @@ x-api: &api
 x-web: &web
   image: ${IMAGE_REPO}-frontend:${RELEASE}
   env_file: /etc/dacn/web.env
-  environment:
-    RELEASE: ${RELEASE}
+  environment: *runtime-env
   user: "10001:10001"
   read_only: true
   tmpfs: [ /tmp, /app/.next/cache ]
@@ -86,6 +89,8 @@ services:
     image: grafana/alloy:v1.20.1
     command: [ "run", "/etc/alloy/config.alloy", "--storage.path=/var/lib/alloy" ]
     env_file: /etc/dacn/alloy.env
+    environment:
+      APP_ENV: ${APP_ENV}
     labels: { dacn.secrets-hash: "${SECRETS_HASH_ALLOY:-}" }
     volumes:
       - ./alloy:/etc/alloy:ro

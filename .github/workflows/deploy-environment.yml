@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.environment }}
-      url: ${{ vars.PUBLIC_URL }}
+      url: ${{ steps.site.outputs.url }}
     permissions:
       contents: read
       packages: read
@@ -28,11 +28,14 @@ jobs:
       ENVIRONMENT: ${{ inputs.environment }}
       RELEASE: ${{ inputs.release }}
       TARGET: deploy@${{ vars.DEPLOY_HOST }}
-      PUBLIC_URL: ${{ vars.PUBLIC_URL }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.release }}
+
+      - name: Địa chỉ công khai (suy ra từ SITE_DOMAIN trong deploy.env)
+        id: site
+        run: echo "url=https://$(sed -n 's/^SITE_DOMAIN=//p' "deploy/env/$ENVIRONMENT/deploy.env")" >> "$GITHUB_OUTPUT"
 
       - name: Khóa SSH
         env:
@@ -49,7 +52,7 @@ jobs:
           OWNER: ${{ github.repository_owner }}
         run: |
           rsync -az --delete --exclude env/ deploy/ "$TARGET:/opt/dacn/"
-          { cat "deploy/env/$ENVIRONMENT/deploy.env"; echo "IMAGE_REPO=ghcr.io/${OWNER,,}/dacn"; } > /tmp/deploy.env
+          { cat "deploy/env/$ENVIRONMENT/deploy.env"; echo "APP_ENV=$ENVIRONMENT"; echo "IMAGE_REPO=ghcr.io/${OWNER,,}/dacn"; } > /tmp/deploy.env
           scp /tmp/deploy.env "deploy/env/$ENVIRONMENT/app.env" "deploy/env/$ENVIRONMENT/web.env" \
             "deploy/env/$ENVIRONMENT/alloy.env" "$TARGET:/etc/dacn/"
 
@@ -109,6 +112,8 @@ jobs:
 
       - name: Smoke test (chỉ đọc, an toàn cho production)
         working-directory: frontend
+        env:
+          PUBLIC_URL: ${{ steps.site.outputs.url }}
         run: |
           curl -fsS --retry 10 --retry-delay 3 --retry-all-errors "$PUBLIC_URL/api/v1/health/ready"
           npm ci
