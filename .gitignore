@@ -1,0 +1,35 @@
+# ---- Môi trường & secret (không bao giờ commit) ----
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+secrets/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# ---- Node / Next.js ----
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+playwright-report/
+test-results/
+coverage/
+
+# ---- Editor / OS ----
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
