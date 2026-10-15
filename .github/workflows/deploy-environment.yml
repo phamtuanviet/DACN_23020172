@@ -1,0 +1,120 @@
+# Các bước deploy MỘT môi trường; deploy.yml gọi cho staging, production và khi chạy tay.
+# Biến (vars) và secret khai báo riêng trong từng GitHub Environment — danh sách ở deploy/README.md.
+name: Deploy environment
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      release:
+        type: string
+        required: true
+      skip_migrate:
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ vars.PUBLIC_URL }}
+    permissions:
+      contents: read
+      packages: read
+    env:
+      ENVIRONMENT: ${{ inputs.environment }}
+      RELEASE: ${{ inputs.release }}
+      TARGET: deploy@${{ vars.DEPLOY_HOST }}
+      PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.release }}
+
+      - name: Khóa SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Chép file deploy và cấu hình của môi trường
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          rsync -az --delete --exclude env/ deploy/ "$TARGET:/opt/dacn/"
+          { cat "deploy/env/$ENVIRONMENT/deploy.env"; echo "IMAGE_REPO=ghcr.io/${OWNER,,}/dacn"; } > /tmp/deploy.env
+          scp /tmp/deploy.env "deploy/env/$ENVIRONMENT/app.env" "deploy/env/$ENVIRONMENT/web.env" \
+            "deploy/env/$ENVIRONMENT/alloy.env" "$TARGET:/etc/dacn/"
+
+      - name: Ghi secret
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_MIGRATOR_URL: ${{ secrets.DATABASE_MIGRATOR_URL }}
+          JWT_KEYS: ${{ secrets.JWT_KEYS }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          VALKEY_PASSWORD: ${{ secrets.VALKEY_PASSWORD }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          GRAFANA_CLOUD_TOKEN: ${{ secrets.GRAFANA_CLOUD_TOKEN }}
+          ORIGIN_CERT: ${{ secrets.ORIGIN_CERT }}
+          ORIGIN_KEY: ${{ secrets.ORIGIN_KEY }}
+        run: |
+          # shellcheck disable=SC2029  # cố ý: tên file mở rộng ở runner rồi gửi sang máy chủ
+          # Ghi nguyên tử; nhóm dacn (gid 10001, user chạy container) đọc được, người khác không.
+          put() {
+            printf '%s' "$2" | ssh "$TARGET" "umask 027 && cat > /etc/dacn/secrets/$1.tmp \
+              && chgrp dacn /etc/dacn/secrets/$1.tmp && mv /etc/dacn/secrets/$1.tmp /etc/dacn/secrets/$1"
+          }
+          put database_url "$DATABASE_URL"
+          put database_migrator_url "$DATABASE_MIGRATOR_URL"
+          put jwt_keys "$JWT_KEYS"
+          put llm_api_key "$LLM_API_KEY"
+          put smtp_user "$SMTP_USER"
+          put smtp_password "$SMTP_PASSWORD"
+          put sentry_dsn "$SENTRY_DSN"
+          put grafana_cloud_token "$GRAFANA_CLOUD_TOKEN"
+          put origin_cert "$ORIGIN_CERT"
+          put origin_key "$ORIGIN_KEY"
+          put valkey_url "redis://:$VALKEY_PASSWORD@valkey:6379/0"
+          put valkey_conf "$(printf 'requirepass %s\nsave ""\nappendonly no\nmaxmemory 128mb\nmaxmemory-policy allkeys-lru\n' "$VALKEY_PASSWORD")"
+
+      - name: Đăng nhập GHCR trên máy chủ (token tự hết hạn khi job kết thúc)
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          # shellcheck disable=SC2029  # cố ý: tên user mở rộng ở runner
+          printf '%s' "$GHCR_TOKEN" | ssh "$TARGET" "docker login ghcr.io -u '$ACTOR' --password-stdin"
+
+      - name: Deploy
+        env:
+          SKIP_MIGRATE: ${{ inputs.skip_migrate && '--skip-migrate' || '' }}
+        run: |
+          # shellcheck disable=SC2029  # cố ý: tham số mở rộng ở runner
+          ssh "$TARGET" "/opt/dacn/deploy.sh '$RELEASE' $SKIP_MIGRATE"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Smoke test (chỉ đọc, an toàn cho production)
+        working-directory: frontend
+        run: |
+          curl -fsS --retry 10 --retry-delay 3 --retry-all-errors "$PUBLIC_URL/api/v1/health/ready"
+          npm ci
+          npx playwright install --with-deps chromium
+          E2E_BASE_URL="$PUBLIC_URL" npx playwright test e2e/smoke.spec.ts --project=desktop
+
+      - name: Đăng xuất GHCR
+        if: always()
+        run: ssh "$TARGET" "docker logout ghcr.io" || true

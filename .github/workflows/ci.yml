@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16.15
+        env: { POSTGRES_DB: dacn, POSTGRES_USER: dacn, POSTGRES_PASSWORD: dacn }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U dacn" --health-interval 5s --health-retries 10
+      valkey:
+        image: valkey/valkey:8.1.10
+        ports: ["6379:6379"]
+    env:
+      DATABASE_URL: postgresql+psycopg://dacn:dacn@localhost:5432/dacn
+      VALKEY_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy app
+      - name: Migration chạy được trên database trống
+        run: uv run alembic upgrade head
+      - name: Test (gồm integration, trừ đánh giá Agent tốn phí LLM)
+        run: uv run pytest --cov=app --cov-report=term -m "not agent_eval"
+      - name: OpenAPI đã commit khớp với code
+        run: |
+          uv run python -m app.cli export-openapi ../frontend/src/shared/api/openapi.json
+          git diff --exit-code -- ../frontend/src/shared/api/openapi.json
+      - name: Lỗ hổng thư viện Python
+        run: |
+          uv export --frozen --no-dev --format requirements-txt > /tmp/requirements.txt
+          uvx pip-audit --requirement /tmp/requirements.txt --disable-pip
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - name: Kiểu TypeScript khớp OpenAPI
+        run: |
+          npm run gen:api
+          git diff --exit-code -- src/shared/api/schema.d.ts
+      - run: npm run build
+      - name: Lỗ hổng thư viện npm (phụ thuộc chạy thật)
+        run: npm audit --omit=dev --audit-level=high
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
