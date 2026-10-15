@@ -1,0 +1,48 @@
+// Grafana Alloy: log container (journald) → Loki, metrics backend → Prometheus của Grafana Cloud.
+// URL và user lấy từ /etc/dacn/alloy.env; token đọc từ Docker secret.
+
+loki.relabel "containers" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal_container_name"]
+    target_label  = "container"
+  }
+}
+
+loki.source.journal "containers" {
+  forward_to    = [loki.write.cloud.receiver]
+  relabel_rules = loki.relabel.containers.rules
+  labels        = { env = sys.env("APP_ENV") }
+}
+
+loki.write "cloud" {
+  endpoint {
+    url = sys.env("GRAFANA_LOKI_URL")
+
+    basic_auth {
+      username      = sys.env("GRAFANA_LOKI_USER")
+      password_file = "/run/secrets/grafana_cloud_token"
+    }
+  }
+}
+
+prometheus.scrape "backend" {
+  targets = [
+    {"__address__" = "backend_a:8000", "instance" = "backend_a", "env" = sys.env("APP_ENV")},
+    {"__address__" = "backend_b:8000", "instance" = "backend_b", "env" = sys.env("APP_ENV")},
+  ]
+  forward_to      = [prometheus.remote_write.cloud.receiver]
+  scrape_interval = "30s"
+}
+
+prometheus.remote_write "cloud" {
+  endpoint {
+    url = sys.env("GRAFANA_PROM_URL")
+
+    basic_auth {
+      username      = sys.env("GRAFANA_PROM_USER")
+      password_file = "/run/secrets/grafana_cloud_token"
+    }
+  }
+}

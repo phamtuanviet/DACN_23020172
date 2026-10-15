@@ -1,0 +1,54 @@
+# Caddy dùng chung cho staging và production; tên miền lấy từ biến SITE_DOMAIN (docs mục 11.3).
+{
+	servers {
+		# Chỉ tin IP thật do Cloudflare gửi. Nguồn: https://www.cloudflare.com/ips/ — cập nhật khi Cloudflare đổi.
+		trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+		client_ip_headers CF-Connecting-IP
+	}
+}
+
+{$SITE_DOMAIN} {
+	tls /run/secrets/origin_cert /run/secrets/origin_key # chứng chỉ Cloudflare Origin CA
+	encode zstd gzip
+	request_body {
+		max_size 1MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+
+	handle /api/* {
+		reverse_proxy backend_a:8000 backend_b:8000 {
+			health_uri /api/v1/health/ready
+			health_interval 5s
+			lb_try_duration 10s # replica đang khởi động lại → chuyển sang replica còn lại
+			header_up X-Request-ID {http.request.uuid}
+		}
+	}
+
+	handle /_next/static/* {
+		root * /srv/next-static
+		uri strip_prefix /_next/static
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	handle {
+		reverse_proxy frontend_a:3000 frontend_b:3000 {
+			health_uri /healthz
+			health_interval 5s
+			lb_try_duration 10s
+		}
+	}
+}
+
+# Chỉ trong mạng nội bộ (cổng không publish): Next.js gọi API công khai khi render trang.
+:8081 {
+	reverse_proxy backend_a:8000 backend_b:8000 {
+		health_uri /api/v1/health/ready
+		health_interval 5s
+	}
+}

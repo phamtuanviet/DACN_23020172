@@ -1,0 +1,115 @@
+# Cấu hình dùng chung cho STAGING và PRODUCTION (docs mục 11.2).
+# Hai môi trường chỉ khác nhau ở file trong /etc/dacn trên từng máy chủ:
+#   deploy.env, app.env, web.env, alloy.env  ← chép từ deploy/env/<môi trường>/ (không chứa secret)
+#   secrets/*                                ← ghi từ GitHub Environments (secret)
+# Không chạy tay: dùng deploy.sh.
+
+x-app: &app
+  image: ${IMAGE_REPO}-backend:${RELEASE}
+  env_file: /etc/dacn/app.env
+  environment:
+    RELEASE: ${RELEASE}
+  secrets: [ database_url, jwt_keys, llm_api_key, smtp_user, smtp_password, valkey_url, sentry_dsn ]
+  user: "10001:10001"
+  read_only: true
+  tmpfs: [ /tmp ]
+  restart: unless-stopped
+  logging: { driver: journald }
+  networks: [ internal ]
+
+x-api: &api
+  <<: *app
+  # Chỉ Caddy gọi được backend (mạng nội bộ) nên tin header X-Forwarded-* trong mạng này.
+  command: uvicorn --factory app.main:create_app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips "*" --timeout-graceful-shutdown 40
+  healthcheck: { test: [ "CMD", "python", "-m", "app.healthcheck" ], interval: 10s, retries: 3, start_period: 20s }
+  stop_grace_period: 45s
+
+x-web: &web
+  image: ${IMAGE_REPO}-frontend:${RELEASE}
+  env_file: /etc/dacn/web.env
+  environment:
+    RELEASE: ${RELEASE}
+  user: "10001:10001"
+  read_only: true
+  tmpfs: [ /tmp, /app/.next/cache ]
+  healthcheck: { test: [ "CMD", "node", "healthcheck.js" ], interval: 10s, retries: 3, start_period: 15s }
+  stop_grace_period: 20s
+  restart: unless-stopped
+  logging: { driver: journald }
+  networks: [ internal ]
+
+services:
+  caddy:
+    image: caddy:2.11.7
+    ports: [ "80:80", "443:443" ]
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - next_static:/srv/next-static:ro
+      - caddy_data:/data
+    secrets: [ origin_cert, origin_key ]
+    restart: unless-stopped
+    logging: { driver: journald }
+    networks: [ internal ]
+
+  frontend_a: *web
+  frontend_b: *web
+
+  backend_a: *api
+  backend_b: *api
+
+  worker:
+    <<: *app
+    command: python -m app.worker
+    stop_grace_period: 30s
+
+  migrate:                     # chỉ chạy qua deploy.sh, bằng role app_migrator (docs mục 7.3)
+    <<: *app
+    command: alembic upgrade head
+    secrets: [ database_migrator_url ]
+    restart: "no"
+    profiles: [ migrate ]
+
+  valkey:
+    image: valkey/valkey:8.1.10
+    command: [ "valkey-server", "/run/secrets/valkey_conf" ]   # requirepass, maxmemory, không lưu xuống đĩa
+    user: "10001:10001"
+    secrets: [ valkey_conf ]
+    restart: unless-stopped
+    networks: [ internal ]
+
+  alloy:                       # đẩy log (journald) và metrics (/metrics) lên Grafana Cloud
+    image: grafana/alloy:v1.20.1
+    command: [ "run", "/etc/alloy/config.alloy", "--storage.path=/var/lib/alloy" ]
+    env_file: /etc/dacn/alloy.env
+    volumes:
+      - ./alloy:/etc/alloy:ro
+      - /var/log/journal:/var/log/journal:ro
+      - /etc/machine-id:/etc/machine-id:ro
+      - alloy_data:/var/lib/alloy
+    secrets: [ grafana_cloud_token ]
+    restart: unless-stopped
+    networks: [ internal ]
+
+secrets:   # file do workflow deploy ghi từ GitHub Environments; chủ sở hữu nhóm 10001, quyền 640
+  database_url:          { file: /etc/dacn/secrets/database_url }
+  database_migrator_url: { file: /etc/dacn/secrets/database_migrator_url }
+  jwt_keys:              { file: /etc/dacn/secrets/jwt_keys }
+  llm_api_key:           { file: /etc/dacn/secrets/llm_api_key }
+  smtp_user:             { file: /etc/dacn/secrets/smtp_user }
+  smtp_password:         { file: /etc/dacn/secrets/smtp_password }
+  valkey_url:            { file: /etc/dacn/secrets/valkey_url }
+  valkey_conf:           { file: /etc/dacn/secrets/valkey_conf }
+  sentry_dsn:            { file: /etc/dacn/secrets/sentry_dsn }
+  grafana_cloud_token:   { file: /etc/dacn/secrets/grafana_cloud_token }
+  origin_cert:           { file: /etc/dacn/secrets/origin_cert }
+  origin_key:            { file: /etc/dacn/secrets/origin_key }
+
+volumes:
+  next_static: {}
+  caddy_data: {}
+  alloy_data: {}
+
+networks:
+  internal: {}
