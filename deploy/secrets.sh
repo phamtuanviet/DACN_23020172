@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Secret và variable của GitHub Environments, theo danh sách deploy/secrets.conf.
 #
+# Trên máy bạn (cần gh đã đăng nhập; thường gọi qua make):
+#   secrets.sh setup <môi trường>       tạo environment nếu chưa có, hỏi lần lượt giá trị còn thiếu
+#   secrets.sh status <môi trường>      xem đủ/thiếu, không đổi gì
+#   secrets.sh set <môi trường> <TÊN>   đặt lại một giá trị (đổi hoặc xoay khóa)
 # Trong workflow deploy (SECRETS_JSON, VARS_JSON = toJSON(secrets), toJSON(vars)):
 #   secrets.sh preflight <môi trường>   thiếu hoặc sai định dạng thì dừng, trước khi chạm vào máy chủ
 #   secrets.sh upload <môi trường>      ghi secret thành file /etc/dacn/secrets/* trên máy chủ $TARGET
@@ -173,10 +177,210 @@ cmd_lint() {
   echo "Cấu hình deploy hợp lệ."
 }
 
+# --- Trên máy bạn: đọc và ghi GitHub qua gh ------------------------------------------------------
+
+readonly REPO_API="repos/{owner}/{repo}"
+
+gh_environment() { gh api "$REPO_API/environments/$1" 2>/dev/null; }
+
+random_token() { head -c "$1" /dev/urandom | base64 -w0 | tr '+/' '-_' | tr -d '='; }
+
+has_reviewers() { jq -e '.protection_rules[]? | select(.type == "required_reviewers")' <<<"$1" >/dev/null; }
+
+# Tạo environment nếu chưa có; production thì bật thêm bảo vệ.
+ensure_environment() {
+  local env=$1
+  if ! gh_environment "$env" >/dev/null; then
+    echo "Tạo environment $env trên GitHub"
+    gh api -X PUT "$REPO_API/environments/$env" --silent
+  fi
+  if [[ $env == production ]]; then protect_environment "$env"; fi
+}
+
+# Bạn phải bấm duyệt mỗi lần deploy, và chỉ deploy được từ nhánh main.
+protect_environment() {
+  local env=$1 info
+  info=$(gh_environment "$env")
+  if ! has_reviewers "$info"; then
+    echo "Bật bảo vệ $env: bạn phải bấm duyệt mỗi lần deploy, chỉ deploy từ nhánh main"
+    jq -n --argjson id "$(gh api user --jq .id)" \
+      '{reviewers: [{type: "User", id: $id}], deployment_branch_policy: {protected_branches: false, custom_branch_policies: true}}' \
+      | gh api -X PUT "$REPO_API/environments/$env" --input - --silent
+    info=$(gh_environment "$env")
+  fi
+  if jq -e '.deployment_branch_policy.custom_branch_policies == true' <<<"$info" >/dev/null \
+    && ! gh api "$REPO_API/environments/$env/deployment-branch-policies" --jq '.branch_policies[].name' | grep -qx main; then
+    gh api -X POST "$REPO_API/environments/$env/deployment-branch-policies" -f name=main -f type=branch --silent
+  fi
+}
+
+# In giá trị ra stdout (lời nhắc ra stderr); rỗng nghĩa là bỏ qua. Không giá trị nào được ghi ra đĩa.
+obtain() {
+  local env=$1 type=$2 value path host keys answer tmp
+  case $type in
+    jwt | password)
+      read -rsp "  Dán giá trị, nhập ẩn (Enter để tự sinh): " value </dev/tty && echo >&2
+      if [[ -z $value ]]; then
+        echo "  Đã tự sinh." >&2
+        if [[ $type == jwt ]]; then value="k$(date +%Y%m%d):$(random_token 48)"; else value=$(random_token 32); fi
+      fi
+      printf '%s' "$value"
+      ;;
+    ssh-key)
+      tmp=$(mktemp -d)
+      ssh-keygen -q -t ed25519 -N '' -C "dacn-ci-$env" -f "$tmp/key"
+      host=$(gh variable list --env "$env" --json name,value --jq '.[] | select(.name == "DEPLOY_HOST") | .value')
+      {
+        echo "  Đã tạo khóa SSH mới cho CI. Cài khóa công khai vào user deploy trên máy chủ $env:"
+        echo "    echo '$(cat "$tmp/key.pub")' | ssh <tài khoản có sudo>@${host:-<máy chủ>} \\"
+        echo "      \"sudo -u deploy sh -c 'mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys'\""
+      } >&2
+      cat "$tmp/key"
+      rm -rf "$tmp"
+      ;;
+    known-hosts)
+      host=$(gh variable list --env "$env" --json name,value --jq '.[] | select(.name == "DEPLOY_HOST") | .value')
+      [[ -n $host ]] || { echo "  Cần đặt DEPLOY_HOST trước." >&2 && return 0; }
+      keys=$(ssh-keyscan -T 10 "$host" 2>/dev/null) || true
+      [[ -n $keys ]] || { echo "  Không lấy được khóa host của $host (máy chủ tắt hoặc cổng 22 bị chặn)." >&2 && return 0; }
+      echo "  Vân tay khóa host của $host; so với \`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub\` trên máy chủ:" >&2
+      ssh-keygen -lf - <<<"$keys" | sed 's/^/    /' >&2
+      read -rp "  Đúng máy chủ của bạn? (y/N) " answer </dev/tty
+      if [[ $answer == [yY] ]]; then echo "$keys"; fi
+      ;;
+    pem-cert | pem-key)
+      read -rep "  Đường dẫn file PEM (Enter để bỏ qua): " path </dev/tty
+      path=${path/#\~/$HOME}
+      if [[ -n $path && ! -r $path ]]; then echo "  Không đọc được $path" >&2 && return 0; fi
+      if [[ -n $path ]]; then cat -- "$path"; fi
+      ;;
+    host) read -rp "  Giá trị (Enter để bỏ qua): " value </dev/tty && printf '%s' "$value" ;;
+    *) read -rsp "  Giá trị, nhập ẩn (Enter để bỏ qua): " value </dev/tty && echo >&2 && printf '%s' "$value" ;;
+  esac
+}
+
+store() {  # <môi trường> <loại> <TÊN> <giá trị>; secret đi qua stdin để không lộ trên dòng lệnh
+  if [[ $2 == secret ]]; then printf '%s' "$4" | gh secret set "$3" --env "$1"
+  else gh variable set "$3" --env "$1" --body "$4"; fi
+}
+
+# Hỏi hoặc tự sinh một giá trị, kiểm tra định dạng rồi lưu lên GitHub; trả mã lỗi nếu bị bỏ qua.
+prompt_and_store() {
+  local env=$1 name=$2 kind=$3 required=$4 type=$5 desc=$6 value reason
+  printf '\n▸ %s — %s\n' "$name" "$desc" >&2
+  while true; do
+    value=$(obtain "$env" "$type")
+    if [[ -z $value ]]; then
+      if is_required "$required" "$env"; then
+        echo "  Bỏ qua. Bắt buộc với $env: deploy sẽ dừng ở bước kiểm tra cho tới khi có." >&2
+      else
+        echo "  Bỏ qua (tùy chọn)." >&2
+      fi
+      return 1
+    fi
+    reason=$(check_value "$type" "$value")
+    [[ -n $reason ]] || break
+    echo "  ✗ $reason. Nhập lại." >&2
+  done
+  store "$env" "$kind" "$name" "$value"
+}
+
+protection_summary() {  # <môi trường> <JSON environment>
+  local reviewers branches
+  reviewers=$(jq -r '[.protection_rules[]? | select(.type == "required_reviewers") | .reviewers[].reviewer.login] | join(", ")' <<<"$2")
+  case $(jq -r '.deployment_branch_policy | if . == null then "all" elif .protected_branches then "protected" else "custom" end' <<<"$2") in
+    all) branches="mọi nhánh" ;;
+    protected) branches="nhánh được bảo vệ" ;;
+    *) branches=$(gh api "$REPO_API/environments/$1/deployment-branch-policies" --jq '[.branch_policies[].name] | join(", ")') ;;
+  esac
+  echo "người duyệt: ${reviewers:-không có}; được deploy từ: ${branches:-không nhánh nào}"
+}
+
+cmd_status() {
+  local env=$1 info secrets vars repo_names name kind required desc state missing=0
+  local -a shared=()
+  if ! info=$(gh_environment "$env"); then
+    echo "Environment $env chưa có trên GitHub. Tạo và nhập giá trị: make secrets env=$env"
+    return 0
+  fi
+  secrets=$(gh secret list --env "$env" --json name,updatedAt)
+  vars=$(gh variable list --env "$env" --json name,value)
+  repo_names=$(gh secret list --json name --jq '.[].name'; gh variable list --json name --jq '.[].name')
+
+  echo "Environment $env — $(protection_summary "$env" "$info")"
+  echo
+  while read -r name kind required _ _ desc <&3; do
+    if [[ $kind == secret ]]; then
+      state=$(jq -r --arg n "$name" '.[] | select(.name == $n) | "✓ đặt ngày \(.updatedAt[:10])"' <<<"$secrets")
+    else
+      state=$(jq -r --arg n "$name" '.[] | select(.name == $n) | .value | split("\n") | "✓ " + (if length > 1 then "\(length) dòng" else .[0] end)' <<<"$vars")
+    fi
+    if [[ -z $state ]] && is_required "$required" "$env"; then
+      state="✗ THIẾU — $desc"
+      missing=$((missing + 1))
+    elif [[ -z $state ]]; then
+      state="– chưa đặt (tùy chọn)"
+    fi
+    printf '  %-22s %-6s %s\n' "$name" "$kind" "$state"
+    if grep -qx "$name" <<<"$repo_names"; then shared+=("$name"); fi
+  done 3< <(entries)
+
+  echo
+  if ((missing)); then echo "Còn $missing giá trị bắt buộc. Nhập bằng: make secrets env=$env"; else echo "Đủ giá trị bắt buộc cho $env."; fi
+  if [[ $env == production ]] && ! has_reviewers "$info"; then
+    warn "production chưa có người duyệt: chạy make secrets env=production để bật"
+  fi
+  if ((${#shared[@]})); then
+    warn "Đặt ở cấp repository, dùng chung cho cả staging và production nếu environment không có: ${shared[*]}. Nên chuyển vào environment rồi xóa: gh secret delete <TÊN>"
+  fi
+}
+
+cmd_setup() {
+  local env=$1 existing name kind required type desc
+  ensure_environment "$env"
+  existing=$(gh secret list --env "$env" --json name --jq '.[].name'; gh variable list --env "$env" --json name --jq '.[].name')
+  echo "Nhập giá trị còn thiếu cho $env. Giá trị đã có giữ nguyên; đổi bằng: make secret env=$env name=<TÊN>"
+  while read -r name kind required _ type desc <&3; do
+    grep -qx "$name" <<<"$existing" || prompt_and_store "$env" "$name" "$kind" "$required" "$type" "$desc" || true
+  done 3< <(entries)
+  echo
+  cmd_status "$env"
+}
+
+cmd_set() {
+  local env=$1 name=${2^^} line kind required type desc
+  line=$(entries | awk -v n="$name" '$1 == n')
+  [[ -n $line ]] || die "$name không có trong deploy/secrets.conf"
+  read -r _ kind required _ type desc <<<"$line"
+  ensure_environment "$env"
+  if ! prompt_and_store "$env" "$name" "$kind" "$required" "$type" "$desc"; then
+    echo "Không đổi gì."
+    return 0
+  fi
+  case $type in
+    jwt) echo "Chỉ có khóa mới thì mọi người phải đăng nhập lại; muốn giữ phiên, nhập <kid mới>:<khóa>,<kid cũ>:<khóa cũ>." ;;
+    password) echo "Lần deploy kế tiếp tạo lại Valkey: gián đoạn vài giây, mất dữ liệu tạm trong Valkey." ;;
+    ssh-key) echo "Cài khóa công khai ở trên trước khi deploy; deploy xong thì xóa khóa cũ khỏi authorized_keys." ;;
+  esac
+  echo "Có hiệu lực ở lần deploy kế tiếp: make deploy env=$env"
+}
+
 usage() { sed -n '2,/^set -euo/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 1; }
 
 main() {
   case ${1:-} in
+    setup | status | set)
+      if ! command -v gh >/dev/null || ! command -v jq >/dev/null; then
+        die "Cần GitHub CLI (gh, đã gh auth login) và jq"
+      fi
+      check_environment "${2:-}"
+      if [[ $1 == set ]]; then
+        [[ -n ${3:-} ]] || die "Cách dùng: secrets.sh set <môi trường> <TÊN>, TÊN lấy trong deploy/secrets.conf"
+        cmd_set "$2" "$3"
+      else
+        "cmd_$1" "$2"
+      fi
+      ;;
     preflight | upload)
       check_environment "${2:-}"
       "cmd_$1" "$2"
