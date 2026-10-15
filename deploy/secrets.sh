@@ -39,7 +39,7 @@ check_value() {
   case $type in
     host) [[ $value =~ ^[A-Za-z0-9.:-]+$ ]] || echo "phải là IP hoặc tên máy chủ" ;;
     known-hosts) [[ $value =~ (ssh-|ecdsa-) ]] || echo "không giống kết quả của ssh-keyscan" ;;
-    ssh-key) [[ $value == *"-----BEGIN OPENSSH PRIVATE KEY-----"* ]] || echo "không phải khóa riêng OpenSSH" ;;
+    ssh-key) [[ $value == *"-----BEGIN OPENSSH PRIVATE"* ]] || echo "không phải khóa riêng OpenSSH" ;;
     pg-url)
       if [[ $value != postgresql+psycopg://* ]]; then echo "phải bắt đầu bằng postgresql+psycopg://"
       elif [[ $value =~ @(localhost|127\.0\.0\.1)[:/] ]]; then echo "không được trỏ tới localhost"; fi ;;

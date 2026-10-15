@@ -1,0 +1,3 @@
+# Phát hiện nhầm đã kiểm tra (gitleaks bỏ qua theo fingerprint). Ghi rõ lý do cho từng dòng.
+# Mẫu tiêu đề PEM dùng để kiểm tra định dạng trong deploy/secrets.sh, không phải khóa thật.
+aff49141388ffee89709b41b25677b52b4e34cdf:deploy/secrets.sh:private-key:38
