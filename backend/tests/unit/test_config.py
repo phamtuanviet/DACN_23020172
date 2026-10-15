@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from app.core.config import Environment, Settings
@@ -50,3 +52,20 @@ def test_blank_optional_values_are_unset() -> None:
     assert settings.llm_api_key is None
     assert settings.sentry_dsn is None
     assert settings.llm_fallback_model is None
+
+
+@pytest.mark.parametrize("env_value", ["postgresql+psycopg://tu-app-env@db/dacn", ""])
+def test_secret_file_wins_over_env(
+    env_value: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "database_url").write_text("postgresql+psycopg://tu-github@db/dacn")
+    monkeypatch.setenv("DATABASE_URL", env_value)
+    settings = Settings(_env_file=None, _secrets_dir=tmp_path)
+    assert settings.database_url.get_secret_value() == "postgresql+psycopg://tu-github@db/dacn"
+
+
+@pytest.mark.parametrize("field", ["database_url", "valkey_url", "jwt_keys"])
+def test_staging_rejects_empty_secret(field: str) -> None:
+    settings = Settings(_env_file=None, **{**VALID_STAGING, field: ""})
+    with pytest.raises(RuntimeError, match=f"thiếu {field}"):
+        settings.validate_for_runtime()

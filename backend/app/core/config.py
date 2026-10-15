@@ -5,8 +5,9 @@ Một image chạy cho cả ba môi trường; khác nhau chỉ ở biến môi 
 - staging:     giống production, nhưng được bật /docs và nạp dữ liệu giả.
 - production:  tắt /docs, chặn seed, bắt buộc đủ secret thật khi khởi động.
 
-Secret đọc từ biến môi trường hoặc file trong /run/secrets (Docker secrets);
-tên file trùng tên trường, ví dụ /run/secrets/database_url.
+Thứ tự ưu tiên: file trong /run/secrets (Docker secrets) → biến môi trường → .env → mặc định.
+Tên file trùng tên trường, ví dụ /run/secrets/database_url. Development không có /run/secrets
+nên chỉ dùng biến môi trường.
 """
 
 from enum import StrEnum
@@ -14,7 +15,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from pydantic import SecretStr, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 SECRETS_DIR = Path("/run/secrets")
 DEV_JWT_KEY = "dev:dev-only-insecure-signing-key-change-me"
@@ -91,6 +92,22 @@ class Settings(BaseSettings):
         """File secret rỗng hoặc dòng `X=` trong env file được hiểu là chưa cấu hình."""
         return None if isinstance(value, str) and not value.strip() else value
 
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """File secret thắng biến môi trường (mặc định của pydantic-settings là ngược lại).
+
+        Nhờ vậy một dòng trùng tên trong deploy/env/*.env, kể cả dòng để trống,
+        không thể đè lên secret thật ghi từ GitHub Environments.
+        """
+        return init_settings, file_secret_settings, env_settings, dotenv_settings
+
     # ---------------------------------------------------------------- suy ra từ môi trường
     @property
     def is_development(self) -> bool:
@@ -118,6 +135,17 @@ class Settings(BaseSettings):
         if self.is_development:
             return
         problems: list[str] = []
+        # Secret thiếu trên GitHub thành file rỗng: báo ngay thay vì lỗi kết nối khó hiểu về sau.
+        required = {
+            "database_url": self.database_url,
+            "valkey_url": self.valkey_url,
+            "jwt_keys": self.jwt_keys,
+        }
+        problems += [
+            f"thiếu {name}"
+            for name, value in required.items()
+            if not value.get_secret_value().strip()
+        ]
         if self.jwt_keys.get_secret_value() == DEV_JWT_KEY:
             problems.append("jwt_keys đang là khóa dev")
         if "localhost" in self.database_url.get_secret_value():
