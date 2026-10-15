@@ -5,16 +5,17 @@
 #   deploy.sh <RELEASE> [--skip-migrate]
 set -euo pipefail
 
-RELEASE="${1:?Cách dùng: deploy.sh <RELEASE> [--skip-migrate]}"
-SKIP_MIGRATE="${2:-}"
-CONFIG_DIR=/etc/dacn
-STATIC_RETENTION_DAYS=14   # giữ file tĩnh của bản cũ cho người đang mở trang (docs mục 9.6)
+readonly CONFIG_DIR=/etc/dacn
+readonly STATIC_RETENTION_DAYS=14   # giữ file tĩnh của bản cũ cho người đang mở trang (docs mục 9.6)
 
 cd "$(dirname "$0")"
 set -a
 # shellcheck source=/dev/null
 source "$CONFIG_DIR/deploy.env"
 set +a
+# Nhận tham số SAU khi nạp deploy.env: dòng RELEASE= lỡ nằm trong file không đè được bản workflow truyền vào.
+RELEASE="${1:?Cách dùng: deploy.sh <RELEASE> [--skip-migrate]}"
+SKIP_MIGRATE="${2:-}"
 export RELEASE
 COMPOSE=(docker compose -f compose.prod.yaml)
 
