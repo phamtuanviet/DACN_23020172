@@ -41,6 +41,19 @@ roll() {   # thay từng replica, replica kia tiếp tục nhận request qua Ca
   done
 }
 
+# Mẫu checksum (như annotation checksum/secret của Helm): label của service mang mã băm các file
+# secret nó dùng. Secret đổi → cấu hình đổi → compose tạo lại đúng service đó, kể cả khi deploy lại
+# cùng bản phát hành. Thiếu bước này, container đang chạy vẫn đọc giá trị cũ của file secret.
+secrets_hash() {
+  "${COMPOSE[@]}" config "$1" | { grep -oE "$CONFIG_DIR/secrets/[a-z_]+" || true; } \
+    | sort -u | xargs -r cat -- | sha256sum | cut -c1-16
+}
+SECRETS_HASH_APP=$(secrets_hash backend_a)
+SECRETS_HASH_CADDY=$(secrets_hash caddy)
+SECRETS_HASH_VALKEY=$(secrets_hash valkey)
+SECRETS_HASH_ALLOY=$(secrets_hash alloy)
+export SECRETS_HASH_APP SECRETS_HASH_CADDY SECRETS_HASH_VALKEY SECRETS_HASH_ALLOY
+
 log "Bản phát hành $RELEASE lên $SITE_DOMAIN"
 "${COMPOSE[@]}" pull --quiet
 

@@ -9,6 +9,7 @@ x-app: &app
   env_file: /etc/dacn/app.env
   environment:
     RELEASE: ${RELEASE}
+  labels: { dacn.secrets-hash: "${SECRETS_HASH_APP:-}" }   # secret đổi → tạo lại container (deploy.sh)
   secrets: [ database_url, jwt_keys, llm_api_key, smtp_user, smtp_password, valkey_url, sentry_dsn ]
   user: "10001:10001"
   read_only: true
@@ -44,6 +45,7 @@ services:
     ports: [ "80:80", "443:443" ]
     environment:
       SITE_DOMAIN: ${SITE_DOMAIN}
+    labels: { dacn.secrets-hash: "${SECRETS_HASH_CADDY:-}" }
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - next_static:/srv/next-static:ro
@@ -75,6 +77,7 @@ services:
     image: valkey/valkey:8.1.10
     command: [ "valkey-server", "/run/secrets/valkey_conf" ]   # requirepass, maxmemory, không lưu xuống đĩa
     user: "10001:10001"
+    labels: { dacn.secrets-hash: "${SECRETS_HASH_VALKEY:-}" }
     secrets: [ valkey_conf ]
     restart: unless-stopped
     networks: [ internal ]
@@ -83,6 +86,7 @@ services:
     image: grafana/alloy:v1.20.1
     command: [ "run", "/etc/alloy/config.alloy", "--storage.path=/var/lib/alloy" ]
     env_file: /etc/dacn/alloy.env
+    labels: { dacn.secrets-hash: "${SECRETS_HASH_ALLOY:-}" }
     volumes:
       - ./alloy:/etc/alloy:ro
       - /var/log/journal:/var/log/journal:ro
