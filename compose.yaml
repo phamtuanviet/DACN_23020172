@@ -1,0 +1,62 @@
+# Môi trường DEVELOPMENT: `docker compose up` (hoặc `make dev`).
+# Staging và production dùng deploy/compose.prod.yaml — không dùng file này.
+name: dacn
+
+x-backend-env: &backend-env
+  APP_ENV: development
+  DATABASE_URL: postgresql+psycopg://dacn:dacn@db:5432/dacn
+  VALKEY_URL: redis://valkey:6379/0
+  SMTP_HOST: mailpit
+  SMTP_PORT: "1025"
+  PUBLIC_BASE_URL: http://localhost:3000
+
+services:
+  db:
+    image: postgres:16.15
+    environment: { POSTGRES_DB: dacn, POSTGRES_USER: dacn, POSTGRES_PASSWORD: dacn }
+    ports: [ "${DB_PORT:-5432}:5432" ]          # đổi cổng host trong .env nếu 5432 đã bị chiếm
+    volumes: [ "pgdata:/var/lib/postgresql/data" ]
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U dacn -d dacn" ]
+      interval: 5s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:8.1.10
+    ports: [ "${VALKEY_PORT:-6379}:6379" ]
+
+  mailpit:                                   # chỉ có ở development: hứng email, xem tại http://localhost:8025
+    image: axllent/mailpit:v1.31.4
+    ports: [ "8025:8025" ]
+
+  backend:
+    build: { context: ./backend, target: dev }
+    environment: *backend-env
+    env_file: [ { path: .env, required: false } ]   # ghi đè tùy chọn, ví dụ LLM_API_KEY
+    command: sh -c "alembic upgrade head && uvicorn --factory app.main:create_app --host 0.0.0.0 --port 8000 --reload"
+    ports: [ "8000:8000" ]
+    volumes: [ "./backend/app:/app/app", "./backend/alembic:/app/alembic", "./backend/tests:/app/tests" ]  # chỉ mount mã nguồn để hot reload
+    depends_on:
+      db: { condition: service_healthy }
+      valkey: { condition: service_started }
+
+  worker:
+    build: { context: ./backend, target: dev }
+    environment: *backend-env
+    env_file: [ { path: .env, required: false } ]   # ghi đè tùy chọn, ví dụ LLM_API_KEY
+    command: python -m app.worker
+    volumes: [ "./backend/app:/app/app" ]
+    depends_on: [ backend ]
+
+  frontend:
+    build: { context: ./frontend, target: dev }
+    environment:
+      APP_ENV: development
+      API_INTERNAL_URL: http://backend:8000   # server Next.js gọi API công khai khi render
+      BACKEND_DEV_URL: http://backend:8000    # đích của rewrites /api/* khi chạy `next dev`
+    ports: [ "3000:3000" ]
+    volumes: [ "./frontend/src:/app/src", "./frontend/public:/app/public" ]  # đổi file cấu hình thì build lại image
+    depends_on: [ backend ]
+
+volumes:
+  pgdata:
