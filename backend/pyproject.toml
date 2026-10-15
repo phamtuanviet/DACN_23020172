@@ -1,0 +1,73 @@
+[project]
+name = "dacn-backend"
+version = "0.1.0"
+description = "Backend hệ thống đặt lịch khám bệnh tích hợp AI Agent"
+requires-python = ">=3.12"
+dependencies = [
+  # Web
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.4",
+  # Dữ liệu
+  "sqlalchemy[asyncio]>=2.0.30",
+  "psycopg[binary]>=3.2",
+  "alembic>=1.13",
+  "redis>=5.0",                 # client cho Valkey (tương thích Redis)
+  # Bảo mật
+  "argon2-cffi>=23.1",
+  "pyjwt>=2.8",
+  "slowapi>=0.1.9",
+  # Tác vụ nền, email
+  "apscheduler>=3.10,<4",
+  "aiosmtplib>=3.0",
+  "jinja2>=3.1",
+  # AI Agent
+  "langgraph>=0.2",
+  "langchain-anthropic>=0.3",
+  # Quan sát
+  "structlog>=24.1",
+  "sentry-sdk[fastapi]>=2.0",
+  "prometheus-fastapi-instrumentator>=7.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.24",
+  "pytest-cov>=5.0",
+  "httpx>=0.27",
+  "ruff>=0.6",
+  "mypy>=1.11",
+  "faker>=28.0",
+]
+
+[tool.uv]
+package = false   # ứng dụng, không đóng gói thành thư viện
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "ASYNC", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]   # cho phép ký tự tiếng Việt trong chuỗi và chú thích
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["slowapi.*", "apscheduler.*", "prometheus_fastapi_instrumentator.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+  "integration: cần PostgreSQL thật (chạy trong CI hoặc compose)",
+  "agent_eval: gọi LLM thật, chỉ chạy khi đánh giá Agent",
+]
+addopts = "-m 'not integration and not agent_eval'"
