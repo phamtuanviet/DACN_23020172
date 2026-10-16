@@ -271,10 +271,10 @@ Mũi tên nghĩa là "gọi hàm của". Quy tắc: không có vòng phụ thu�
 
 - Access token: JWT HS256, claim `sub` (user id), `role`, `type=access`, hết hạn sau 30 phút; gửi qua header `Authorization: Bearer`. Khóa ký nằm trong secret và có `kid`: lúc xoay khóa, backend vẫn chấp nhận khóa cũ thêm 30 phút nên người dùng không bị đăng xuất hàng loạt.
 - Refresh token: chuỗi ngẫu nhiên 256 bit (không phải JWT), hết hạn sau 7 ngày. Database chỉ lưu SHA-256 của token trong bảng `refresh_tokens` (mục 7.4), nên lộ bản sao database cũng không dùng được token. Token nằm trong cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth`.
-- Xoay vòng: mỗi lần gọi `/auth/refresh`, token cũ bị thu hồi và một token mới cùng `family_id` được cấp. Nếu một token đã thu hồi bị dùng lại — dấu hiệu token bị đánh cắp — cả family bị thu hồi và người dùng phải đăng nhập lại.
+- Xoay vòng: mỗi lần gọi `/auth/refresh`, token cũ bị thu hồi và một token mới cùng `family_id` được cấp. Nếu một token đã thu hồi bị dùng lại — dấu hiệu token bị đánh cắp — cả family bị thu hồi và người dùng phải đăng nhập lại. Ngoại lệ: token vừa bị xoay trong vòng 30 giây (hai tab mở cùng lúc cùng refresh) được cấp thêm một token cùng family thay vì thu hồi.
 - Thu hồi: đăng xuất thu hồi token hiện tại; đổi mật khẩu, yêu cầu xóa tài khoản và quản trị khóa tài khoản thu hồi mọi token của người dùng đó.
 - Mỗi request, `current_user` giải mã access token rồi đọc dòng `users` theo khóa chính (một truy vấn khoảng 1 ms) để kiểm tra `is_active`; tài khoản bị khóa mất quyền ngay, không đợi token hết hạn.
-- Đăng nhập sai tăng `failed_login_count`; lần sai thứ 5 đặt `locked_until = now + 15 phút` (FR-AUTH-03); đăng nhập đúng đặt lại bộ đếm. Thông báo lỗi không phân biệt "sai email" với "sai mật khẩu".
+- Đăng nhập sai tăng `failed_login_count`; lần sai thứ 5 đặt `locked_until = now + 15 phút` và trả ngay `429 ACCOUNT_LOCKED` kèm `details.locked_until` (FR-AUTH-03); đăng nhập đúng đặt lại bộ đếm. Thông báo lỗi không phân biệt "sai email" với "sai mật khẩu"; email không tồn tại vẫn băm thử một lần để thời gian phản hồi như nhau.
 
 **Phân quyền hai lớp.** Lớp 1 ở router: `require_roles(...)` chặn sai vai trò, trả 403. Lớp 2 ở service (`appointments/policy.py`): kiểm tra quyền trên từng bản ghi theo BR-05, trả 403 (AC-05). Lớp 2 là bắt buộc vì tool của Agent gọi thẳng service, không đi qua router.
 
@@ -643,7 +643,7 @@ Các chỉ mục bổ sung so với ERD (dòng đánh dấu ở trên và hai ch
 
 | Thay đổi | Lý do |
 | --- | --- |
-| Bảng `refresh_tokens` (id uuid PK, user_id FK, token_hash UNIQUE, family_id uuid, expires_at, revoked_at, replaced_by, created_at, user_agent, ip) | Thu hồi và xoay vòng refresh token (TD-07); thay quyết định "không có bảng refresh token" ở ERD mục 6 |
+| Bảng `refresh_tokens` (id uuid PK, user_id FK ON DELETE CASCADE, token_hash varchar(64) UNIQUE, family_id uuid, expires_at, revoked_at, replaced_by uuid, created_at, user_agent varchar(255), ip inet) | Thu hồi và xoay vòng refresh token (TD-07); thay quyết định "không có bảng refresh token" ở ERD mục 6 |
 | Cột `users.privacy_consent_at` (timestamptz) | Lưu thời điểm bệnh nhân đồng ý chính sách xử lý dữ liệu khi đăng ký (mục 11.8) |
 | Cột `users.anonymized_at` (timestamptz) | Đánh dấu tài khoản đã ẩn danh hóa theo yêu cầu xóa: họ tên, email, số điện thoại, ngày sinh bị thay bằng giá trị vô danh; lịch hẹn giữ lại cho thống kê nhưng không còn định danh được |
 | Chỉ mục `conversations (patient_id, last_message_at DESC)` | Đếm hạn mức tin nhắn, mở lại hội thoại gần nhất |
@@ -984,7 +984,7 @@ sequenceDiagram
         API-->>FE: 429 ACCOUNT_LOCKED
     else Sai mật khẩu
         API->>DB: failed_login_count + 1, lần thứ 5 đặt locked_until = now + 15 phút
-        API-->>FE: 401 UNAUTHENTICATED
+        API-->>FE: 401 UNAUTHENTICATED (lần thứ 5: 429 ACCOUNT_LOCKED)
     else Đúng mật khẩu
         API->>DB: failed_login_count = 0, INSERT refresh_tokens (chỉ lưu băm)
         API-->>FE: access token trong body, refresh token qua Set-Cookie HttpOnly

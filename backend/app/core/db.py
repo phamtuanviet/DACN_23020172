@@ -2,7 +2,9 @@
 
 from collections.abc import AsyncIterator
 from functools import lru_cache
+from typing import Annotated
 
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -34,3 +36,6 @@ async def get_session() -> AsyncIterator[AsyncSession]:
     """Dependency của FastAPI. Service tự mở transaction bằng `async with session.begin()`."""
     async with get_sessionmaker()() as session:
         yield session
+
+
+SessionDep = Annotated[AsyncSession, Depends(get_session)]

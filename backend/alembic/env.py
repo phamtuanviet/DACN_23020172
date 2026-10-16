@@ -21,7 +21,10 @@ def run_migrations_offline() -> None:
         url=get_settings().migration_database_url,
         target_metadata=target_metadata,
         literal_binds=True,
+        # SQL in ra dán thẳng vào psql được (không nhân đôi dấu %)
+        dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        transaction_per_migration=True,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -30,7 +33,14 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     engine = create_engine(get_settings().migration_database_url, poolclass=pool.NullPool)
     with engine.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            # Mỗi migration một transaction: giá trị enum thêm bằng ALTER TYPE … ADD VALUE
+            # dùng được ở migration kế tiếp (docs mục 7.3).
+            transaction_per_migration=True,
+        )
         with context.begin_transaction():
             context.run_migrations()
 

@@ -222,6 +222,7 @@ Dữ liệu nghiệp vụ không bao giờ bị xóa cứng (dùng `is_active` h
 | doctors – services | N – N | doctor\_services (doctor\_id, service\_id) | CASCADE |
 | doctors – shifts | 1 – N | shifts.doctor\_id | CASCADE |
 | doctors – time\_offs | 1 – N | time\_offs.doctor\_id | CASCADE |
+| users – time\_offs (người tạo) | 0..1 – N | time\_offs.created\_by (NULL = dữ liệu mẫu, hệ thống) | RESTRICT |
 | users (bệnh nhân) – appointments | 1 – N | appointments.patient\_id | RESTRICT |
 | doctors – appointments | 1 – N | appointments.doctor\_id | RESTRICT |
 | services – appointments | 1 – N | appointments.service\_id | RESTRICT |
@@ -269,7 +270,7 @@ Quy tắc quan trọng nhất (BR-01, BR-09: không trùng lịch) được đ�
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 ALTER TABLE appointments
-  ADD CONSTRAINT chk_appt_time CHECK (end_at > start_at),
+  ADD CONSTRAINT ck_appointments_time_order CHECK (end_at > start_at),
   -- BR-01: một bác sĩ không có hai lịch chồng thời gian
   ADD CONSTRAINT excl_doctor_overlap EXCLUDE USING gist (
     doctor_id WITH =,
@@ -289,13 +290,15 @@ Khoảng `[)` cho phép lịch 08:00–08:20 và 08:20–08:40 nằm sát nhau. 
 | Bảng | Ràng buộc | Lý do |
 | --- | --- | --- |
 | users | `UNIQUE (lower(email))` | Email không trùng, không phân biệt hoa thường |
-| services | `CHECK (duration_min BETWEEN 10 AND 120 AND duration_min % 5 = 0)`, `UNIQUE (specialty_id, name)` | FR-CAT-02 |
+| services | `CHECK (duration_min BETWEEN 10 AND 120 AND duration_min % 5 = 0)`, `CHECK (ref_price_vnd >= 0)`, `UNIQUE (specialty_id, name)` | FR-CAT-02 |
 | shifts | `CHECK (weekday BETWEEN 1 AND 7)`, `CHECK (end_time > start_time)`, `CHECK (valid_to IS NULL OR valid_to >= valid_from)` | Ca hợp lệ; ca chồng ca kiểm tra ở tầng service |
 | time\_offs | `CHECK (end_at > start_at)` |  |
 | appointments | `UNIQUE (code)` | Mã lịch hẹn `LH-YYMMDD-XXXX` |
 | reviews | `UNIQUE (appointment_id)`, `CHECK (rating BETWEEN 1 AND 5)` | Một đánh giá mỗi lịch |
 | notifications | `UNIQUE (appointment_id, type) WHERE type = 'REMINDER'` | Mỗi lịch chỉ nhắc một lần (FR-NTF-02) |
 | agent\_proposals | `CHECK (type = 'BOOK' OR appointment_id IS NOT NULL)` | Đổi/hủy phải chỉ rõ lịch nào |
+
+Tên ràng buộc theo quy ước của `backend/app/db/base.py`: `ck_<bảng>_<tên>`, `uq_<bảng>_<các cột>`, `fk_<bảng>_<cột>_<bảng đích>`; riêng hai exclusion constraint giữ tên ở mục 5.1 vì backend dựa vào tên để trả `SLOT_TAKEN`, `PATIENT_OVERLAP`.
 
 Các quy tắc phụ thuộc thời điểm hiện tại (mốc 2 giờ, cửa sổ 30 ngày, tối đa 3 lịch đang chờ) không đặt bằng CHECK vì `now()` thay đổi; chúng kiểm tra ở tầng service trong cùng transaction.
 
@@ -313,6 +316,7 @@ Các quy tắc phụ thuộc thời điểm hiện tại (mốc 2 giờ, cửa s
 | `agent_proposals (expires_at) WHERE status = 'PENDING'` | Tác vụ nền hết hạn đề xuất |
 | `messages (conversation_id, created_at)` | Tải lịch sử chat |
 | `tool_call_logs (conversation_id, created_at)`, `(tool_name)` | Đánh giá Agent |
+| `agent_proposals (conversation_id)`, `support_requests (conversation_id)` | Job xóa hội thoại cũ (CASCADE, SET NULL) không quét cả bảng |
 
 Tìm kiếm không dấu (FR-CAT-04) dùng extension `unaccent` với `ILIKE`; với khoảng 20 dịch vụ và 20 bác sĩ thì chưa cần chỉ mục trigram.
 
