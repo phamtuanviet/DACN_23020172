@@ -1,5 +1,14 @@
-import { PagePlaceholder } from "@/shared/ui/page-placeholder";
+import type { Metadata } from "next";
+import { Suspense } from "react";
+
+import { RegisterScreen } from "@/features/auth";
+
+export const metadata: Metadata = { title: "Đăng ký" };
 
 export default function Page() {
-  return <PagePlaceholder title="Đăng ký" description="UC01, FR-AUTH-01; bắt buộc đồng ý chính sách xử lý dữ liệu." />;
+  return (
+    <Suspense>
+      <RegisterScreen />
+    </Suspense>
+  );
 }

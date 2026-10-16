@@ -1,5 +1,14 @@
-import { PagePlaceholder } from "@/shared/ui/page-placeholder";
+import type { Metadata } from "next";
+import { Suspense } from "react";
+
+import { LoginScreen } from "@/features/auth";
+
+export const metadata: Metadata = { title: "Đăng nhập" };
 
 export default function Page() {
-  return <PagePlaceholder title="Đăng nhập" description="UC02, FR-AUTH-02, 03." />;
+  return (
+    <Suspense>
+      <LoginScreen />
+    </Suspense>
+  );
 }

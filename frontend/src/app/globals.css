@@ -1,5 +1,69 @@
 @import "tailwindcss";
 
-:root {
-  color-scheme: light;
+/* Token giao diện hướng A "Rõ ràng" (docs/Design Direction). Đổi màu, bo góc ở đây, không viết mã màu
+   rải rác trong component. Mỗi token sinh utility tương ứng của Tailwind: bg-primary, text-muted,
+   border-line, rounded-card… */
+@theme {
+  --font-sans: var(--font-be-vietnam-pro), ui-sans-serif, system-ui, sans-serif;
+
+  --color-ground: #f5f7f8; /* nền trang */
+  --color-surface: #ffffff; /* thẻ, ô nhập */
+  --color-ink: #13262b; /* chữ chính, nền khu vực bác sĩ và quản trị */
+  --color-subtle: #3d5257; /* chữ phụ trên nền màu */
+  --color-muted: #51656a; /* chữ phụ */
+  --color-line: #d9e1e3; /* viền thẻ */
+  --color-line-strong: #c9d5d8; /* viền ô nhập */
+  --color-divider: #e6ecee;
+
+  --color-primary: #0d6b66;
+  --color-primary-hover: #0a5652;
+  --color-primary-soft: #e3f1ef;
+  --color-primary-ink: #0b5753;
+
+  --color-amber-soft: #fff3d6;
+  --color-amber-line: #f1d9a8;
+  --color-amber-ink: #6b4400;
+  --color-amber: #9a5b00;
+
+  --color-danger: #b42318;
+  --color-danger-soft: #fef3f2;
+  --color-danger-line: #f4c2bd;
+  --color-danger-ink: #8e1b12;
+  --color-success: #1f7a3f;
+
+  /* Trạng thái lịch hẹn: nền / chữ (luôn kèm chữ, không chỉ dựa vào màu) */
+  --color-booked-soft: #e6eefb;
+  --color-booked: #1d4e9e;
+  --color-arrived-soft: #fff1d6;
+  --color-arrived: #8a5300;
+  --color-completed-soft: #e3f3e8;
+  --color-completed: #1f6b3a;
+  --color-cancelled-soft: #eef1f2;
+  --color-cancelled: #4b5a5e;
+  --color-noshow-soft: #fce8e6;
+  --color-noshow: #a3261c;
+
+  --radius-control: 8px;
+  --radius-card: 12px;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-ground font-sans text-ink antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  ::placeholder {
+    color: var(--color-muted);
+    opacity: 0.8;
+  }
 }

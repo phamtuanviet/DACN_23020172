@@ -1,7 +1,14 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { RoleGuard } from "@/shared/auth/role-guard";
+import { StaffShell } from "@/shared/layout/staff-shell";
 
 export default function Layout({ children }: { children: ReactNode }) {
-  return <RoleGuard roles={["DOCTOR"]}>{children}</RoleGuard>;
+  return (
+    <Suspense>
+      <RoleGuard roles={["DOCTOR"]}>
+        <StaffShell role="DOCTOR">{children}</StaffShell>
+      </RoleGuard>
+    </Suspense>
+  );
 }

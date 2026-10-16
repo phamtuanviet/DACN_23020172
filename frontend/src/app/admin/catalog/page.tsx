@@ -1,5 +1,5 @@
 import { PagePlaceholder } from "@/shared/ui/page-placeholder";
 
 export default function Page() {
-  return <PagePlaceholder title="Danh mục" description="Chuyên khoa, dịch vụ (UC13)." />;
+  return <PagePlaceholder sprint={5} title="Danh mục" description="Chuyên khoa, dịch vụ (UC13)." />;
 }
