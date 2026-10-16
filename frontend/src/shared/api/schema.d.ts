@@ -55,7 +55,7 @@ export interface paths {
         put?: never;
         /**
          * Register
-         * @description Đăng ký bệnh nhân (FR-AUTH-01); đăng nhập luôn sau khi tạo.
+         * @description Đăng ký bệnh nhân (FR-AUTH-01); đăng nhập luôn sau khi tạo; tối đa 5 lần/phút/IP.
          */
         post: operations["register_api_v1_auth_register_post"];
         delete?: never;

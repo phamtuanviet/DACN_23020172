@@ -20,7 +20,9 @@ from app.db.models.catalog import DoctorService, Service, Specialty
 from app.db.models.schedule import Shift, TimeOff
 from app.db.models.users import Doctor, PatientProfile, User
 
-DEMO_PASSWORD = "Demo12345"  # mọi tài khoản @demo.local; chỉ có ở development và staging
+# Mật khẩu chung của tài khoản @demo.local CHỈ ở development. Staging công khai trên Internet nên
+# lệnh seed hỏi mật khẩu khi chạy, không dùng giá trị nằm trong repo (gồm cả tài khoản quản trị).
+DEMO_PASSWORD = "Demo12345"
 RANDOM_SEED = 20261010
 
 SPECIALTIES: list[tuple[str, str]] = [
@@ -271,7 +273,9 @@ MORNING = (time(8, 0), time(11, 30))
 AFTERNOON = (time(13, 30), time(17, 0))
 
 
-async def seed_database(session: AsyncSession, clock: Clock) -> dict[str, int]:
+async def seed_database(
+    session: AsyncSession, clock: Clock, password: str = DEMO_PASSWORD
+) -> dict[str, int]:
     """Nạp dữ liệu mẫu vào database trống. Đã có dữ liệu thì từ chối, không ghi đè."""
     async with session.begin():
         existing = (await session.execute(select(func.count()).select_from(User))).scalar_one()
@@ -281,7 +285,7 @@ async def seed_database(session: AsyncSession, clock: Clock) -> dict[str, int]:
         now = clock.now()
         today = to_local(now).date()
         rng = random.Random(RANDOM_SEED)
-        password_hash = await hash_password_async(DEMO_PASSWORD)
+        password_hash = await hash_password_async(password)
 
         specialties = {name: Specialty(name=name, description=desc) for name, desc in SPECIALTIES}
         session.add_all(specialties.values())

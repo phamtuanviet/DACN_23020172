@@ -185,14 +185,7 @@ class AuthService:
             elif user.locked_until is not None and user.locked_until > now:
                 error = account_locked(user.locked_until)
             elif not await verify_password_async(user.password_hash, password):
-                user.failed_login_count += 1
-                if user.failed_login_count >= MAX_FAILED_LOGINS:
-                    locked_until = now + LOCK_DURATION
-                    user.locked_until = locked_until
-                    user.failed_login_count = 0
-                    error = account_locked(locked_until)
-                else:
-                    error = invalid_credentials()
+                error = self._count_failure(user, now) or invalid_credentials()
             else:
                 user.failed_login_count = 0
                 user.locked_until = None
@@ -283,16 +276,31 @@ class AuthService:
     async def change_password(
         self, actor: Actor, data: ChangePasswordRequest, client: ClientInfo
     ) -> IssuedSession:
-        """Đổi mật khẩu thu hồi mọi phiên, rồi cấp phiên mới cho chính thiết bị này (docs 4.6)."""
+        """Đổi mật khẩu thu hồi mọi phiên, rồi cấp phiên mới cho chính thiết bị này (docs 4.6).
+
+        Nhập sai mật khẩu hiện tại cũng tính vào bộ đếm khóa như đăng nhập, để token bị lộ không
+        dùng được vào việc đoán mật khẩu không giới hạn.
+        """
         now = self._clock.now()
+        error: AppError | None = None
+        issued: IssuedSession | None = None
         async with self._session.begin():
             user = await self._load_user(actor, for_update=True)
-            if not await verify_password_async(user.password_hash, data.current_password):
-                raise field_error("current_password", "Mật khẩu hiện tại không đúng.")
-            user.password_hash = await hash_password_async(data.new_password)
-            await repo.revoke_all_of_user(self._session, user.id, now)
-            issued = await self._issue(user, await self._profile_of(user), client, now)
-        log.info("auth.password_changed", user_id=user.id)
+            if user.locked_until is not None and user.locked_until > now:
+                error = account_locked(user.locked_until)
+            elif not await verify_password_async(user.password_hash, data.current_password):
+                error = self._count_failure(user, now) or field_error(
+                    "current_password", "Mật khẩu hiện tại không đúng."
+                )
+            else:
+                user.failed_login_count = 0
+                user.password_hash = await hash_password_async(data.new_password)
+                await repo.revoke_all_of_user(self._session, user.id, now)
+                issued = await self._issue(user, await self._profile_of(user), client, now)
+        if error is not None:
+            raise error
+        assert issued is not None
+        log.info("auth.password_changed", user_id=issued.me.id)
         return issued
 
     # ------------------------------------------------------------------------ nội bộ
@@ -303,6 +311,16 @@ class AuthService:
         if user is None or not user.is_active or user.anonymized_at is not None:
             raise session_expired()
         return user
+
+    def _count_failure(self, user: User, now: datetime) -> AppError | None:
+        """Tăng bộ đếm sai mật khẩu; lần thứ 5 khóa 15 phút và trả lỗi ACCOUNT_LOCKED."""
+        user.failed_login_count += 1
+        if user.failed_login_count < MAX_FAILED_LOGINS:
+            return None
+        locked_until = now + LOCK_DURATION
+        user.locked_until = locked_until
+        user.failed_login_count = 0
+        return account_locked(locked_until)
 
     async def _profile_of(self, user: User) -> PatientProfile | None:
         if user.role is not UserRole.PATIENT:

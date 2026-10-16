@@ -274,7 +274,9 @@ Mũi tên nghĩa là "gọi hàm của". Quy tắc: không có vòng phụ thu�
 - Xoay vòng: mỗi lần gọi `/auth/refresh`, token cũ bị thu hồi và một token mới cùng `family_id` được cấp. Nếu một token đã thu hồi bị dùng lại — dấu hiệu token bị đánh cắp — cả family bị thu hồi và người dùng phải đăng nhập lại. Ngoại lệ: token vừa bị xoay trong vòng 30 giây (hai tab mở cùng lúc cùng refresh) được cấp thêm một token cùng family thay vì thu hồi.
 - Thu hồi: đăng xuất thu hồi token hiện tại; đổi mật khẩu, yêu cầu xóa tài khoản và quản trị khóa tài khoản thu hồi mọi token của người dùng đó.
 - Mỗi request, `current_user` giải mã access token rồi đọc dòng `users` theo khóa chính (một truy vấn khoảng 1 ms) để kiểm tra `is_active`; tài khoản bị khóa mất quyền ngay, không đợi token hết hạn.
-- Đăng nhập sai tăng `failed_login_count`; lần sai thứ 5 đặt `locked_until = now + 15 phút` và trả ngay `429 ACCOUNT_LOCKED` kèm `details.locked_until` (FR-AUTH-03); đăng nhập đúng đặt lại bộ đếm. Thông báo lỗi không phân biệt "sai email" với "sai mật khẩu"; email không tồn tại vẫn băm thử một lần để thời gian phản hồi như nhau.
+- Đăng nhập sai tăng `failed_login_count`; lần sai thứ 5 đặt `locked_until = now + 15 phút` và trả ngay `429 ACCOUNT_LOCKED` kèm `details.locked_until` (FR-AUTH-03); đăng nhập đúng đặt lại bộ đếm. Thông báo lỗi không phân biệt "sai email" với "sai mật khẩu"; email không tồn tại vẫn băm thử một lần để thời gian phản hồi như nhau. Nhập sai mật khẩu hiện tại khi đổi mật khẩu cũng tính vào bộ đếm này, để access token bị lộ không dùng được vào việc đoán mật khẩu.
+- Giới hạn tốc độ theo IP: đăng nhập 10 lần/phút, đăng ký 5 lần/phút, refresh 60 lần/phút, đổi mật khẩu 5 lần/phút.
+- Đánh đổi đã chấp nhận: lỗi `ACCOUNT_LOCKED` cho biết email có tài khoản. Điều này không lộ thêm gì vì đăng ký vốn trả `EMAIL_TAKEN` (mục 7.1); giới hạn theo IP làm việc dò email chậm lại. Muốn kín hơn thì đổi cả hai sang thông báo chung kèm email cho chủ tài khoản.
 
 **Phân quyền hai lớp.** Lớp 1 ở router: `require_roles(...)` chặn sai vai trò, trả 403. Lớp 2 ở service (`appointments/policy.py`): kiểm tra quyền trên từng bản ghi theo BR-05, trả 403 (AC-05). Lớp 2 là bắt buộc vì tool của Agent gọi thẳng service, không đi qua router.
 
@@ -656,7 +658,7 @@ Tổng cộng 18 bảng: 17 bảng của ERD và `refresh_tokens`.
 - **Production không có dữ liệu giả.** `seed.py` từ chối chạy khi `APP_ENV=production`. Sau lần deploy đầu, chạy `python -m app.cli create-admin --email …` (mật khẩu nhập tương tác, không qua tham số dòng lệnh) để tạo quản trị đầu tiên. Danh mục ban đầu (chuyên khoa, dịch vụ, bác sĩ) nhập qua giao diện quản trị, hoặc bằng `python -m app.cli import-catalog catalog.yaml` để đỡ nhập tay; `scope_description` của dịch vụ cần viết kỹ vì Agent dựa vào đó để giải thích phạm vi khám (US-10).
 - **Dev và staging dùng seed.** Faker locale `vi_VN` với seed cố định nên kết quả lặp lại được; số lượng như SRS 6.3 (6 chuyên khoa, khoảng 20 dịch vụ, 20 bác sĩ, 50 bệnh nhân, 2 quản trị). Mọi mốc thời gian sinh tương đối so với ngày chạy seed: ca làm hiệu lực từ 2 tuần trước tới 6 tuần sau; khoảng 300 lịch hẹn gồm lịch 2 tuần trước (COMPLETED, NO_SHOW, CANCELLED) và lịch sắp tới (BOOKED).
 - Lịch hẹn mẫu được tạo qua chính `AppointmentService` với đồng hồ giả lùi về quá khứ, nên dữ liệu mẫu tuân theo mọi quy tắc và có sẵn lịch sử thay đổi.
-- Tài khoản demo cố định (ví dụ `admin@demo.local`, `bs.minh@demo.local`, `lan@demo.local`) chỉ tồn tại ở dev và staging.
+- Tài khoản demo cố định (ví dụ `admin@demo.local`, `minh.tran@demo.local`, `lan@demo.local`) chỉ tồn tại ở dev và staging. Mật khẩu chung `Demo12345` chỉ dùng ở dev; ở staging (công khai trên Internet) lệnh seed hỏi mật khẩu khi chạy, vì giá trị nằm trong repo thì ai cũng đọc được.
 
 ### 7.6 Thời gian và múi giờ
 

@@ -249,3 +249,26 @@ async def test_login_is_limited_to_10_attempts_per_minute_per_ip(app_client: Asy
     eleventh = await login(app_client, "khongco@example.com", PASSWORD)
     assert eleventh.status_code == 429
     assert eleventh.json()["code"] == "RATE_LIMITED"
+
+
+async def test_register_is_limited_to_5_per_minute_per_ip(app_client: AsyncClient) -> None:
+    for i in range(5):
+        assert (await register(app_client, email=f"nguoi{i}@example.com")).status_code == 201
+    sixth = await register(app_client, email="nguoi5@example.com")
+    assert sixth.status_code == 429
+    assert sixth.json()["code"] == "RATE_LIMITED"
+
+
+async def test_guessing_current_password_locks_the_account(app_client: AsyncClient) -> None:
+    registered = await register(app_client)
+    for attempt in range(1, 6):
+        response = await app_client.post(
+            "/api/v1/me/password",
+            json={"current_password": f"doan{attempt}xx", "new_password": NEW_PASSWORD},
+            headers=bearer(registered),
+        )
+        assert response.status_code == (429 if attempt == 5 else 422)
+    assert response.json()["code"] == "ACCOUNT_LOCKED"
+    locked_login = await login(app_client, "lan@example.com", PASSWORD)
+    assert locked_login.status_code == 429
+    assert locked_login.json()["code"] == "ACCOUNT_LOCKED"

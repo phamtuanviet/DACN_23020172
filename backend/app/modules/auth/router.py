@@ -11,7 +11,13 @@ from fastapi import APIRouter, Cookie, Depends, Request, Response, status
 
 from app.core.config import Settings
 from app.core.db import SessionDep
-from app.core.ratelimit import LOGIN_LIMIT, limiter
+from app.core.ratelimit import (
+    LOGIN_LIMIT,
+    PASSWORD_CHANGE_LIMIT,
+    REFRESH_LIMIT,
+    REGISTER_LIMIT,
+    limiter,
+)
 from app.core.security import (
     REFRESH_COOKIE,
     REFRESH_COOKIE_PATH,
@@ -70,6 +76,7 @@ def _session_response(
 
 # ---------------------------------------------------------------------------- /auth
 @auth_router.post("/register", status_code=status.HTTP_201_CREATED)
+@limiter.limit(REGISTER_LIMIT)
 async def register(
     body: RegisterRequest,
     request: Request,
@@ -77,7 +84,7 @@ async def register(
     service: AuthServiceDep,
     settings: SettingsDep,
 ) -> TokenResponse:
-    """Đăng ký bệnh nhân (FR-AUTH-01); đăng nhập luôn sau khi tạo."""
+    """Đăng ký bệnh nhân (FR-AUTH-01); đăng nhập luôn sau khi tạo; tối đa 5 lần/phút/IP."""
     issued = await service.register(body, _client(request))
     return _session_response(response, issued, settings)
 
@@ -97,6 +104,7 @@ async def login(
 
 
 @auth_router.post("/refresh")
+@limiter.limit(REFRESH_LIMIT)
 async def refresh(
     request: Request,
     response: Response,
@@ -140,6 +148,7 @@ async def update_me(body: UpdateMeRequest, actor: ActorDep, service: AuthService
 
 
 @me_router.post("/password")
+@limiter.limit(PASSWORD_CHANGE_LIMIT)
 async def change_password(
     body: ChangePasswordRequest,
     request: Request,

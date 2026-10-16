@@ -29,14 +29,18 @@ def export_openapi(output: Path) -> None:
 
 
 def seed() -> None:
-    if not get_settings().seed_allowed:
+    settings = get_settings()
+    if not settings.seed_allowed:
         sys.exit("Từ chối: không nạp dữ liệu giả ở production (docs mục 7.5).")
     from app.db.seed import DEMO_PASSWORD, seed_database
+
+    # Staging công khai trên Internet: không dùng mật khẩu demo nằm trong repo.
+    password = DEMO_PASSWORD if settings.is_development else _ask_password("tài khoản demo")
 
     async def run() -> dict[str, int]:
         try:
             async with get_sessionmaker()() as session:
-                return await seed_database(session, SystemClock())
+                return await seed_database(session, SystemClock(), password)
         finally:
             await get_engine().dispose()
 
@@ -45,21 +49,35 @@ def seed() -> None:
     except RuntimeError as exc:
         sys.exit(f"Bỏ qua: {exc}")
     print("Đã nạp dữ liệu mẫu: " + ", ".join(f"{n} {name}" for name, n in counts.items()))
-    print(f"Tài khoản demo (@demo.local) dùng mật khẩu: {DEMO_PASSWORD}")
+    if settings.is_development:
+        print(f"Tài khoản demo (@demo.local) dùng mật khẩu: {DEMO_PASSWORD}")
+    else:
+        print("Tài khoản demo (@demo.local) dùng mật khẩu vừa nhập.")
 
 
-def create_admin(email: str) -> None:
-    """Tạo quản trị đầu tiên; mật khẩu nhập tương tác, không qua tham số dòng lệnh (docs 7.5)."""
-    from app.modules.auth.schemas import Email, Password
-    from app.modules.auth.service import create_user
+def _ask_password(purpose: str) -> str:
+    """Nhập mật khẩu tương tác (không qua tham số dòng lệnh), kiểm tra theo FR-AUTH-01."""
+    from app.modules.auth.schemas import Password
 
     try:
-        email = TypeAdapter(Email).validate_python(email)
-        password = TypeAdapter(Password).validate_python(getpass.getpass("Mật khẩu: "))
+        password = TypeAdapter(Password).validate_python(getpass.getpass(f"Mật khẩu {purpose}: "))
     except ValidationError as exc:
         sys.exit(exc.errors()[0]["msg"])
     if getpass.getpass("Nhập lại mật khẩu: ") != password:
         sys.exit("Hai lần nhập mật khẩu không khớp.")
+    return password
+
+
+def create_admin(email: str) -> None:
+    """Tạo quản trị đầu tiên; mật khẩu nhập tương tác, không qua tham số dòng lệnh (docs 7.5)."""
+    from app.modules.auth.schemas import Email
+    from app.modules.auth.service import create_user
+
+    try:
+        email = TypeAdapter(Email).validate_python(email)
+    except ValidationError as exc:
+        sys.exit(exc.errors()[0]["msg"])
+    password = _ask_password("quản trị")
     full_name = input("Họ tên: ").strip() or "Quản trị"
 
     async def run() -> int:
