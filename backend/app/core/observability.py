@@ -18,6 +18,8 @@ def init_sentry(settings: Settings) -> None:
         environment=settings.app_env.value,
         release=settings.release,
         send_default_pii=False,  # không gửi dữ liệu cá nhân của bệnh nhân
+        # Biến cục bộ trong stack trace có thể chứa họ tên, email, lý do khám (AGENTS.md).
+        include_local_variables=False,
         traces_sample_rate=0.1,
     )
 
