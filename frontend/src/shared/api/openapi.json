@@ -349,10 +349,1466 @@
           }
         ]
       }
+    },
+    "/api/v1/specialties": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "List Specialties",
+        "description": "Chuyên khoa đang hoạt động, kèm số dịch vụ, số bác sĩ, giá thấp nhất.",
+        "operationId": "list_specialties_api_v1_specialties_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SpecialtyOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Specialties Api V1 Specialties Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/services": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Search Services",
+        "description": "Tìm dịch vụ theo tên, chuyên khoa, phạm vi khám; gõ có dấu hay không dấu (FR-CAT-04).",
+        "operationId": "search_services_api_v1_services_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Từ khóa, có dấu hoặc không dấu",
+              "title": "Q"
+            },
+            "description": "Từ khóa, có dấu hoặc không dấu"
+          },
+          {
+            "name": "specialty_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Specialty Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ServiceOut"
+                  },
+                  "title": "Response Search Services Api V1 Services Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/doctors": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Search Doctors",
+        "description": "Tìm bác sĩ theo tên hoặc chuyên khoa; lọc theo chuyên khoa, dịch vụ (FR-CAT-04).",
+        "operationId": "search_doctors_api_v1_doctors_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Từ khóa, có dấu hoặc không dấu",
+              "title": "Q"
+            },
+            "description": "Từ khóa, có dấu hoặc không dấu"
+          },
+          {
+            "name": "specialty_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Specialty Id"
+            }
+          },
+          {
+            "name": "service_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Service Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DoctorOut"
+                  },
+                  "title": "Response Search Doctors Api V1 Doctors Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/doctors/{doctor_id}": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Get Doctor",
+        "description": "Hồ sơ bác sĩ: dịch vụ thực hiện, lịch làm việc trong tuần (UC03).",
+        "operationId": "get_doctor_api_v1_doctors__doctor_id__get",
+        "parameters": [
+          {
+            "name": "doctor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Doctor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/specialties": {
+      "get": {
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Admin List Specialties",
+        "operationId": "admin_list_specialties_api_v1_admin_specialties_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SpecialtyAdminOut"
+                  },
+                  "type": "array",
+                  "title": "Response Admin List Specialties Api V1 Admin Specialties Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Create Specialty",
+        "description": "Thêm chuyên khoa (FR-CAT-01).",
+        "operationId": "create_specialty_api_v1_admin_specialties_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecialtyCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialtyAdminOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/specialties/{specialty_id}": {
+      "patch": {
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Update Specialty",
+        "description": "Sửa hoặc ẩn chuyên khoa; không có xóa cứng (FR-CAT-05).",
+        "operationId": "update_specialty_api_v1_admin_specialties__specialty_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "specialty_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Specialty Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecialtyUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialtyAdminOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/services": {
+      "get": {
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Admin List Services",
+        "description": "Mọi dịch vụ kể cả đã ẩn, kèm số lịch hẹn đã có.",
+        "operationId": "admin_list_services_api_v1_admin_services_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Từ khóa, có dấu hoặc không dấu",
+              "title": "Q"
+            },
+            "description": "Từ khóa, có dấu hoặc không dấu"
+          },
+          {
+            "name": "specialty_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Specialty Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ServiceAdminOut"
+                  },
+                  "title": "Response Admin List Services Api V1 Admin Services Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Create Service",
+        "description": "Thêm dịch vụ: thời lượng 10–120 phút, bội số 5 (FR-CAT-02).",
+        "operationId": "create_service_api_v1_admin_services_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceAdminOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/services/{service_id}": {
+      "patch": {
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Update Service",
+        "description": "Sửa hoặc ẩn dịch vụ; dịch vụ đã có lịch hẹn chỉ ẩn được, không xóa (FR-CAT-05).",
+        "operationId": "update_service_api_v1_admin_services__service_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "service_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Service Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceAdminOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/availability": {
+      "get": {
+        "tags": [
+          "scheduling"
+        ],
+        "summary": "Get Availability",
+        "description": "Khung trống theo dịch vụ, bác sĩ, khoảng ngày, khoảng giờ (FR-SCH-01..05).\n\nNgày là ngày địa phương `YYYY-MM-DD`; tối đa 31 ngày một lần.",
+        "operationId": "get_availability_api_v1_availability_get",
+        "parameters": [
+          {
+            "name": "service_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Service Id"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Bỏ trống: bác sĩ bất kỳ",
+              "title": "Doctor Id"
+            },
+            "description": "Bỏ trống: bác sĩ bất kỳ"
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Mặc định: hôm nay",
+              "title": "Date From"
+            },
+            "description": "Mặc định: hôm nay"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Mặc định: bằng date_from",
+              "title": "Date To"
+            },
+            "description": "Mặc định: bằng date_from"
+          },
+          {
+            "name": "time_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Lọc buổi, ví dụ 07:00",
+              "title": "Time From"
+            },
+            "description": "Lọc buổi, ví dụ 07:00"
+          },
+          {
+            "name": "time_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Lọc buổi, ví dụ 12:00",
+              "title": "Time To"
+            },
+            "description": "Lọc buổi, ví dụ 12:00"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailabilityOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/availability/earliest": {
+      "get": {
+        "tags": [
+          "scheduling"
+        ],
+        "summary": "Get Earliest",
+        "description": "Khung trống sớm nhất trong 30 ngày của từng dịch vụ; `by_doctor=true` thì của từng bác sĩ.\n\nDùng cho các dòng \"Sớm nhất: …\" ở trang dịch vụ, hồ sơ bác sĩ và bước chọn bác sĩ.",
+        "operationId": "get_earliest_api_v1_availability_earliest_get",
+        "parameters": [
+          {
+            "name": "service_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "maximum": 9223372036854775807,
+                "minimum": 1
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "title": "Service Id"
+            }
+          },
+          {
+            "name": "by_doctor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "By Doctor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EarliestOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointments": {
+      "post": {
+        "tags": [
+          "appointments"
+        ],
+        "summary": "Book Appointment",
+        "description": "Đặt lịch cho chính mình (UC05, FR-APT-01). `doctor_id` rỗng: bác sĩ bất kỳ.\n\nLỗi: BOOKING_WINDOW, SLOT_NOT_OFFERED, DOCTOR_SERVICE_MISMATCH (400); SLOT_TAKEN kèm\n`details.alternatives`, PATIENT_OVERLAP, MAX_ACTIVE_APPOINTMENTS (409).",
+        "operationId": "book_appointment_api_v1_appointments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/doctors/{doctor_id}/shifts": {
+      "get": {
+        "tags": [
+          "admin-schedule"
+        ],
+        "summary": "List Shifts",
+        "operationId": "list_shifts_api_v1_admin_doctors__doctor_id__shifts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doctor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Doctor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ShiftOut"
+                  },
+                  "title": "Response List Shifts Api V1 Admin Doctors  Doctor Id  Shifts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin-schedule"
+        ],
+        "summary": "Create Shift",
+        "description": "Thêm ca lặp hằng tuần; chồng ca đã có thì 409 SHIFT_OVERLAP (FR-ADM-02).",
+        "operationId": "create_shift_api_v1_admin_doctors__doctor_id__shifts_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doctor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Doctor Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShiftIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/doctors/{doctor_id}/shifts/{shift_id}": {
+      "patch": {
+        "tags": [
+          "admin-schedule"
+        ],
+        "summary": "Update Shift",
+        "description": "Sửa ca; lịch BOOKED không còn nằm trong ca nào được gắn cờ cần xử lý (BR-10).",
+        "operationId": "update_shift_api_v1_admin_doctors__doctor_id__shifts__shift_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doctor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Doctor Id"
+            }
+          },
+          {
+            "name": "shift_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Shift Id"
+            }
+          },
+          {
+            "name": "dry_run",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true: chỉ liệt kê lịch bị ảnh hưởng, không ghi gì (UC15 bước 5)",
+              "default": false,
+              "title": "Dry Run"
+            },
+            "description": "true: chỉ liệt kê lịch bị ảnh hưởng, không ghi gì (UC15 bước 5)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShiftUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftChangeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin-schedule"
+        ],
+        "summary": "Delete Shift",
+        "description": "Xóa ca; lịch BOOKED trong ca được gắn cờ cần xử lý, không bị hủy (BR-10).",
+        "operationId": "delete_shift_api_v1_admin_doctors__doctor_id__shifts__shift_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doctor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Doctor Id"
+            }
+          },
+          {
+            "name": "shift_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Shift Id"
+            }
+          },
+          {
+            "name": "dry_run",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true: chỉ liệt kê lịch bị ảnh hưởng, không ghi gì (UC15 bước 5)",
+              "default": false,
+              "title": "Dry Run"
+            },
+            "description": "true: chỉ liệt kê lịch bị ảnh hưởng, không ghi gì (UC15 bước 5)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftChangeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/doctors/{doctor_id}/time-offs": {
+      "get": {
+        "tags": [
+          "admin-schedule"
+        ],
+        "summary": "List Time Offs",
+        "operationId": "list_time_offs_api_v1_admin_doctors__doctor_id__time_offs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doctor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Doctor Id"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Mặc định: hôm nay",
+              "title": "Since"
+            },
+            "description": "Mặc định: hôm nay"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TimeOffOut"
+                  },
+                  "title": "Response List Time Offs Api V1 Admin Doctors  Doctor Id  Time Offs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin-schedule"
+        ],
+        "summary": "Create Time Off",
+        "description": "Thêm ngày nghỉ (UC15 bước 4–6). `dry_run=true` trả 200 và danh sách lịch bị ảnh hưởng;\nghi thật trả 201 và gắn cờ các lịch đó (BR-10).",
+        "operationId": "create_time_off_api_v1_admin_doctors__doctor_id__time_offs_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doctor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Doctor Id"
+            }
+          },
+          {
+            "name": "dry_run",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true: chỉ liệt kê lịch bị ảnh hưởng, không ghi gì (UC15 bước 5)",
+              "default": false,
+              "title": "Dry Run"
+            },
+            "description": "true: chỉ liệt kê lịch bị ảnh hưởng, không ghi gì (UC15 bước 5)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimeOffIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeOffChangeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/doctors/{doctor_id}/time-offs/{time_off_id}": {
+      "delete": {
+        "tags": [
+          "admin-schedule"
+        ],
+        "summary": "Delete Time Off",
+        "operationId": "delete_time_off_api_v1_admin_doctors__doctor_id__time_offs__time_off_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doctor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Doctor Id"
+            }
+          },
+          {
+            "name": "time_off_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Time Off Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AffectedOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "service_name": {
+            "type": "string",
+            "title": "Service Name"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name"
+          },
+          "needs_attention": {
+            "type": "boolean",
+            "title": "Needs Attention"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "start_at",
+          "end_at",
+          "service_name",
+          "patient_name",
+          "needs_attention"
+        ],
+        "title": "AffectedOut",
+        "description": "Lịch BOOKED sắp tới bị ảnh hưởng: nằm trong ngày nghỉ hoặc không còn nằm trong ca nào."
+      },
+      "AppointmentOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Mã lịch hẹn LH-YYMMDD-XXXX"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AppointmentStatus"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
+          "service": {
+            "$ref": "#/components/schemas/ServiceRef"
+          },
+          "doctor": {
+            "$ref": "#/components/schemas/DoctorRef"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "can_change": {
+            "type": "boolean",
+            "title": "Can Change",
+            "description": "Bệnh nhân còn đổi, hủy được không (BR-08)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "status",
+          "channel",
+          "service",
+          "doctor",
+          "start_at",
+          "end_at",
+          "can_change"
+        ],
+        "title": "AppointmentOut"
+      },
+      "AppointmentStatus": {
+        "type": "string",
+        "enum": [
+          "BOOKED",
+          "ARRIVED",
+          "COMPLETED",
+          "CANCELLED",
+          "NO_SHOW"
+        ],
+        "title": "AppointmentStatus"
+      },
+      "AvailabilityOut": {
+        "properties": {
+          "service": {
+            "$ref": "#/components/schemas/ServiceSummary"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/DayOut"
+            },
+            "type": "array",
+            "title": "Days"
+          },
+          "nearest_dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Nearest Dates",
+            "description": "Tối đa 3 ngày gần nhất sau khoảng được hỏi còn khung, chỉ có khi khoảng được hỏi đã kín (FR-SCH-05)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "service",
+          "days",
+          "nearest_dates"
+        ],
+        "title": "AvailabilityOut"
+      },
+      "BookRequest": {
+        "properties": {
+          "service_id": {
+            "type": "integer",
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
+            "title": "Service Id"
+          },
+          "doctor_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Id",
+            "description": "Bỏ trống: bác sĩ bất kỳ"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At",
+            "description": "Giờ bắt đầu của một khung do /availability trả về"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Lý do khám, tùy chọn, tối đa 500 ký tự"
+          }
+        },
+        "type": "object",
+        "required": [
+          "service_id",
+          "start_at"
+        ],
+        "title": "BookRequest"
+      },
       "ChangePasswordRequest": {
         "properties": {
           "current_password": {
@@ -372,6 +1828,215 @@
           "new_password"
         ],
         "title": "ChangePasswordRequest"
+      },
+      "Channel": {
+        "type": "string",
+        "enum": [
+          "WEB",
+          "AGENT",
+          "ADMIN",
+          "SYSTEM"
+        ],
+        "title": "Channel"
+      },
+      "DayOut": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DayStatus"
+          },
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/SlotOut"
+            },
+            "type": "array",
+            "title": "Slots"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "status",
+          "slots"
+        ],
+        "title": "DayOut"
+      },
+      "DayStatus": {
+        "type": "string",
+        "enum": [
+          "OPEN",
+          "FULL",
+          "OFF"
+        ],
+        "title": "DayStatus"
+      },
+      "DoctorDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Họ tên kèm học hàm, ví dụ “ThS. BS. Trần Minh”"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "gender": {
+            "$ref": "#/components/schemas/Gender"
+          },
+          "specialty": {
+            "$ref": "#/components/schemas/SpecialtyRef"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceBrief"
+            },
+            "type": "array",
+            "title": "Services"
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
+          "working_hours": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingHours"
+            },
+            "type": "array",
+            "title": "Working Hours",
+            "description": "Ca làm đang hiệu lực, theo giờ địa phương"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "title",
+          "gender",
+          "specialty",
+          "services",
+          "bio",
+          "working_hours"
+        ],
+        "title": "DoctorDetail"
+      },
+      "DoctorOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Họ tên kèm học hàm, ví dụ “ThS. BS. Trần Minh”"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "gender": {
+            "$ref": "#/components/schemas/Gender"
+          },
+          "specialty": {
+            "$ref": "#/components/schemas/SpecialtyRef"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceBrief"
+            },
+            "type": "array",
+            "title": "Services"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "title",
+          "gender",
+          "specialty",
+          "services"
+        ],
+        "title": "DoctorOut"
+      },
+      "DoctorRef": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "DoctorRef"
+      },
+      "EarliestItem": {
+        "properties": {
+          "service_id": {
+            "type": "integer",
+            "title": "Service Id"
+          },
+          "doctor": {
+            "$ref": "#/components/schemas/DoctorRef"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "service_id",
+          "doctor",
+          "start_at",
+          "end_at"
+        ],
+        "title": "EarliestItem"
+      },
+      "EarliestOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EarliestItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "EarliestOut"
       },
       "Gender": {
         "type": "string",
@@ -526,6 +2191,827 @@
         ],
         "title": "RegisterRequest"
       },
+      "ServiceAdminOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "specialty": {
+            "$ref": "#/components/schemas/SpecialtyRef"
+          },
+          "scope_description": {
+            "type": "string",
+            "title": "Scope Description"
+          },
+          "duration_min": {
+            "type": "integer",
+            "title": "Duration Min"
+          },
+          "ref_price_vnd": {
+            "type": "integer",
+            "title": "Ref Price Vnd"
+          },
+          "doctors": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorRef"
+            },
+            "type": "array",
+            "title": "Doctors",
+            "description": "Bác sĩ đang hoạt động thực hiện dịch vụ"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "appointment_count": {
+            "type": "integer",
+            "title": "Appointment Count",
+            "description": "Số lịch hẹn đã có; khác 0 thì chỉ ẩn được"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "specialty",
+          "scope_description",
+          "duration_min",
+          "ref_price_vnd",
+          "doctors",
+          "is_active",
+          "appointment_count"
+        ],
+        "title": "ServiceAdminOut"
+      },
+      "ServiceBrief": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "duration_min": {
+            "type": "integer",
+            "title": "Duration Min"
+          },
+          "ref_price_vnd": {
+            "type": "integer",
+            "title": "Ref Price Vnd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "duration_min",
+          "ref_price_vnd"
+        ],
+        "title": "ServiceBrief"
+      },
+      "ServiceCreate": {
+        "properties": {
+          "specialty_id": {
+            "type": "integer",
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
+            "title": "Specialty Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 150,
+            "title": "Name"
+          },
+          "scope_description": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Scope Description"
+          },
+          "duration_min": {
+            "type": "integer",
+            "title": "Duration Min"
+          },
+          "ref_price_vnd": {
+            "type": "integer",
+            "title": "Ref Price Vnd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "specialty_id",
+          "name",
+          "scope_description",
+          "duration_min",
+          "ref_price_vnd"
+        ],
+        "title": "ServiceCreate"
+      },
+      "ServiceOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "specialty": {
+            "$ref": "#/components/schemas/SpecialtyRef"
+          },
+          "scope_description": {
+            "type": "string",
+            "title": "Scope Description"
+          },
+          "duration_min": {
+            "type": "integer",
+            "title": "Duration Min"
+          },
+          "ref_price_vnd": {
+            "type": "integer",
+            "title": "Ref Price Vnd"
+          },
+          "doctors": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorRef"
+            },
+            "type": "array",
+            "title": "Doctors",
+            "description": "Bác sĩ đang hoạt động thực hiện dịch vụ"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "specialty",
+          "scope_description",
+          "duration_min",
+          "ref_price_vnd",
+          "doctors"
+        ],
+        "title": "ServiceOut"
+      },
+      "ServiceRef": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ServiceRef"
+      },
+      "ServiceSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "duration_min": {
+            "type": "integer",
+            "title": "Duration Min"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "duration_min"
+        ],
+        "title": "ServiceSummary"
+      },
+      "ServiceUpdate": {
+        "properties": {
+          "specialty_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialty Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 150
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "scope_description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Description"
+          },
+          "duration_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Min"
+          },
+          "ref_price_vnd": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref Price Vnd"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "ServiceUpdate",
+        "description": "Chỉ trường được gửi mới đổi. Đổi thời lượng không ảnh hưởng lịch đã đặt (giữ `end_at`)."
+      },
+      "ShiftChangeOut": {
+        "properties": {
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run"
+          },
+          "shift": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShiftOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Ca sau khi sửa; rỗng khi xóa"
+          },
+          "affected": {
+            "items": {
+              "$ref": "#/components/schemas/AffectedOut"
+            },
+            "type": "array",
+            "title": "Affected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dry_run",
+          "shift",
+          "affected"
+        ],
+        "title": "ShiftChangeOut"
+      },
+      "ShiftIn": {
+        "properties": {
+          "weekday": {
+            "type": "integer",
+            "title": "Weekday",
+            "description": "1 = Thứ Hai … 7 = Chủ nhật"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "time",
+            "title": "End Time"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date",
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To",
+            "description": "Bỏ trống: không hết hạn"
+          }
+        },
+        "type": "object",
+        "required": [
+          "weekday",
+          "start_time",
+          "end_time",
+          "valid_from"
+        ],
+        "title": "ShiftIn"
+      },
+      "ShiftOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "doctor_id": {
+            "type": "integer",
+            "title": "Doctor Id"
+          },
+          "weekday": {
+            "type": "integer",
+            "title": "Weekday"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "time",
+            "title": "End Time"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date",
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "doctor_id",
+          "weekday",
+          "start_time",
+          "end_time",
+          "valid_from",
+          "valid_to"
+        ],
+        "title": "ShiftOut"
+      },
+      "ShiftUpdate": {
+        "properties": {
+          "weekday": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekday"
+          },
+          "start_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time"
+          },
+          "end_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "type": "object",
+        "title": "ShiftUpdate",
+        "description": "Chỉ trường được gửi mới đổi; sau khi gộp với ca hiện tại được kiểm lại như ShiftIn."
+      },
+      "SlotOut": {
+        "properties": {
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "doctors": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorRef"
+            },
+            "type": "array",
+            "title": "Doctors",
+            "description": "Bác sĩ còn trống ở khung này; người đầu tiên là người được chọn khi đặt với “Bác sĩ bất kỳ” (ít lịch nhất trong ngày)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_at",
+          "end_at",
+          "doctors"
+        ],
+        "title": "SlotOut"
+      },
+      "SpecialtyAdminOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "service_count": {
+            "type": "integer",
+            "title": "Service Count",
+            "description": "Số dịch vụ đang hoạt động"
+          },
+          "doctor_count": {
+            "type": "integer",
+            "title": "Doctor Count",
+            "description": "Số bác sĩ đang hoạt động"
+          },
+          "min_price_vnd": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Price Vnd",
+            "description": "Giá tham khảo thấp nhất, để hiện “từ … ₫”"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "service_count",
+          "doctor_count",
+          "min_price_vnd",
+          "is_active"
+        ],
+        "title": "SpecialtyAdminOut"
+      },
+      "SpecialtyCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SpecialtyCreate"
+      },
+      "SpecialtyOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "service_count": {
+            "type": "integer",
+            "title": "Service Count",
+            "description": "Số dịch vụ đang hoạt động"
+          },
+          "doctor_count": {
+            "type": "integer",
+            "title": "Doctor Count",
+            "description": "Số bác sĩ đang hoạt động"
+          },
+          "min_price_vnd": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Price Vnd",
+            "description": "Giá tham khảo thấp nhất, để hiện “từ … ₫”"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "service_count",
+          "doctor_count",
+          "min_price_vnd"
+        ],
+        "title": "SpecialtyOut"
+      },
+      "SpecialtyRef": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SpecialtyRef"
+      },
+      "SpecialtyUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "SpecialtyUpdate",
+        "description": "Chỉ trường được gửi mới đổi; ẩn hoặc hiện lại bằng `is_active`."
+      },
+      "TimeOffChangeOut": {
+        "properties": {
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run"
+          },
+          "time_off": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeOffOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Rỗng khi dry_run"
+          },
+          "affected": {
+            "items": {
+              "$ref": "#/components/schemas/AffectedOut"
+            },
+            "type": "array",
+            "title": "Affected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dry_run",
+          "time_off",
+          "affected"
+        ],
+        "title": "TimeOffChangeOut"
+      },
+      "TimeOffIn": {
+        "properties": {
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_at",
+          "end_at"
+        ],
+        "title": "TimeOffIn"
+      },
+      "TimeOffOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "doctor_id": {
+            "type": "integer",
+            "title": "Doctor Id"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "doctor_id",
+          "start_at",
+          "end_at",
+          "reason"
+        ],
+        "title": "TimeOffOut"
+      },
       "TokenResponse": {
         "properties": {
           "access_token": {
@@ -656,6 +3142,32 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WorkingHours": {
+        "properties": {
+          "weekday": {
+            "type": "integer",
+            "title": "Weekday",
+            "description": "1 = Thứ Hai … 7 = Chủ nhật"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "time",
+            "title": "End Time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "weekday",
+          "start_time",
+          "end_time"
+        ],
+        "title": "WorkingHours"
       }
     },
     "securitySchemes": {

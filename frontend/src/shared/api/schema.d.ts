@@ -165,16 +165,512 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/specialties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Specialties
+         * @description Chuyên khoa đang hoạt động, kèm số dịch vụ, số bác sĩ, giá thấp nhất.
+         */
+        get: operations["list_specialties_api_v1_specialties_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Services
+         * @description Tìm dịch vụ theo tên, chuyên khoa, phạm vi khám; gõ có dấu hay không dấu (FR-CAT-04).
+         */
+        get: operations["search_services_api_v1_services_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/doctors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Doctors
+         * @description Tìm bác sĩ theo tên hoặc chuyên khoa; lọc theo chuyên khoa, dịch vụ (FR-CAT-04).
+         */
+        get: operations["search_doctors_api_v1_doctors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/doctors/{doctor_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Doctor
+         * @description Hồ sơ bác sĩ: dịch vụ thực hiện, lịch làm việc trong tuần (UC03).
+         */
+        get: operations["get_doctor_api_v1_doctors__doctor_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/specialties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin List Specialties */
+        get: operations["admin_list_specialties_api_v1_admin_specialties_get"];
+        put?: never;
+        /**
+         * Create Specialty
+         * @description Thêm chuyên khoa (FR-CAT-01).
+         */
+        post: operations["create_specialty_api_v1_admin_specialties_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/specialties/{specialty_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Specialty
+         * @description Sửa hoặc ẩn chuyên khoa; không có xóa cứng (FR-CAT-05).
+         */
+        patch: operations["update_specialty_api_v1_admin_specialties__specialty_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin List Services
+         * @description Mọi dịch vụ kể cả đã ẩn, kèm số lịch hẹn đã có.
+         */
+        get: operations["admin_list_services_api_v1_admin_services_get"];
+        put?: never;
+        /**
+         * Create Service
+         * @description Thêm dịch vụ: thời lượng 10–120 phút, bội số 5 (FR-CAT-02).
+         */
+        post: operations["create_service_api_v1_admin_services_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/services/{service_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Service
+         * @description Sửa hoặc ẩn dịch vụ; dịch vụ đã có lịch hẹn chỉ ẩn được, không xóa (FR-CAT-05).
+         */
+        patch: operations["update_service_api_v1_admin_services__service_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Availability
+         * @description Khung trống theo dịch vụ, bác sĩ, khoảng ngày, khoảng giờ (FR-SCH-01..05).
+         *
+         *     Ngày là ngày địa phương `YYYY-MM-DD`; tối đa 31 ngày một lần.
+         */
+        get: operations["get_availability_api_v1_availability_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/availability/earliest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Earliest
+         * @description Khung trống sớm nhất trong 30 ngày của từng dịch vụ; `by_doctor=true` thì của từng bác sĩ.
+         *
+         *     Dùng cho các dòng "Sớm nhất: …" ở trang dịch vụ, hồ sơ bác sĩ và bước chọn bác sĩ.
+         */
+        get: operations["get_earliest_api_v1_availability_earliest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/appointments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Book Appointment
+         * @description Đặt lịch cho chính mình (UC05, FR-APT-01). `doctor_id` rỗng: bác sĩ bất kỳ.
+         *
+         *     Lỗi: BOOKING_WINDOW, SLOT_NOT_OFFERED, DOCTOR_SERVICE_MISMATCH (400); SLOT_TAKEN kèm
+         *     `details.alternatives`, PATIENT_OVERLAP, MAX_ACTIVE_APPOINTMENTS (409).
+         */
+        post: operations["book_appointment_api_v1_appointments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/doctors/{doctor_id}/shifts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Shifts */
+        get: operations["list_shifts_api_v1_admin_doctors__doctor_id__shifts_get"];
+        put?: never;
+        /**
+         * Create Shift
+         * @description Thêm ca lặp hằng tuần; chồng ca đã có thì 409 SHIFT_OVERLAP (FR-ADM-02).
+         */
+        post: operations["create_shift_api_v1_admin_doctors__doctor_id__shifts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/doctors/{doctor_id}/shifts/{shift_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Shift
+         * @description Xóa ca; lịch BOOKED trong ca được gắn cờ cần xử lý, không bị hủy (BR-10).
+         */
+        delete: operations["delete_shift_api_v1_admin_doctors__doctor_id__shifts__shift_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Shift
+         * @description Sửa ca; lịch BOOKED không còn nằm trong ca nào được gắn cờ cần xử lý (BR-10).
+         */
+        patch: operations["update_shift_api_v1_admin_doctors__doctor_id__shifts__shift_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/doctors/{doctor_id}/time-offs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Time Offs */
+        get: operations["list_time_offs_api_v1_admin_doctors__doctor_id__time_offs_get"];
+        put?: never;
+        /**
+         * Create Time Off
+         * @description Thêm ngày nghỉ (UC15 bước 4–6). `dry_run=true` trả 200 và danh sách lịch bị ảnh hưởng;
+         *     ghi thật trả 201 và gắn cờ các lịch đó (BR-10).
+         */
+        post: operations["create_time_off_api_v1_admin_doctors__doctor_id__time_offs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/doctors/{doctor_id}/time-offs/{time_off_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Time Off */
+        delete: operations["delete_time_off_api_v1_admin_doctors__doctor_id__time_offs__time_off_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AffectedOut
+         * @description Lịch BOOKED sắp tới bị ảnh hưởng: nằm trong ngày nghỉ hoặc không còn nằm trong ca nào.
+         */
+        AffectedOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /**
+             * End At
+             * Format: date-time
+             */
+            end_at: string;
+            /** Service Name */
+            service_name: string;
+            /** Patient Name */
+            patient_name: string;
+            /** Needs Attention */
+            needs_attention: boolean;
+        };
+        /** AppointmentOut */
+        AppointmentOut: {
+            /** Id */
+            id: number;
+            /**
+             * Code
+             * @description Mã lịch hẹn LH-YYMMDD-XXXX
+             */
+            code: string;
+            status: components["schemas"]["AppointmentStatus"];
+            channel: components["schemas"]["Channel"];
+            service: components["schemas"]["ServiceRef"];
+            doctor: components["schemas"]["DoctorRef"];
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /**
+             * End At
+             * Format: date-time
+             */
+            end_at: string;
+            /**
+             * Can Change
+             * @description Bệnh nhân còn đổi, hủy được không (BR-08)
+             */
+            can_change: boolean;
+        };
+        /**
+         * AppointmentStatus
+         * @enum {string}
+         */
+        AppointmentStatus: "BOOKED" | "ARRIVED" | "COMPLETED" | "CANCELLED" | "NO_SHOW";
+        /** AvailabilityOut */
+        AvailabilityOut: {
+            service: components["schemas"]["ServiceSummary"];
+            /** Days */
+            days: components["schemas"]["DayOut"][];
+            /**
+             * Nearest Dates
+             * @description Tối đa 3 ngày gần nhất sau khoảng được hỏi còn khung, chỉ có khi khoảng được hỏi đã kín (FR-SCH-05)
+             */
+            nearest_dates: string[];
+        };
+        /** BookRequest */
+        BookRequest: {
+            /** Service Id */
+            service_id: number;
+            /**
+             * Doctor Id
+             * @description Bỏ trống: bác sĩ bất kỳ
+             */
+            doctor_id?: number | null;
+            /**
+             * Start At
+             * Format: date-time
+             * @description Giờ bắt đầu của một khung do /availability trả về
+             */
+            start_at: string;
+            /**
+             * Reason
+             * @description Lý do khám, tùy chọn, tối đa 500 ký tự
+             */
+            reason?: string | null;
+        };
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** Current Password */
             current_password: string;
             /** New Password */
             new_password: string;
+        };
+        /**
+         * Channel
+         * @enum {string}
+         */
+        Channel: "WEB" | "AGENT" | "ADMIN" | "SYSTEM";
+        /** DayOut */
+        DayOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            status: components["schemas"]["DayStatus"];
+            /** Slots */
+            slots: components["schemas"]["SlotOut"][];
+        };
+        /**
+         * DayStatus
+         * @enum {string}
+         */
+        DayStatus: "OPEN" | "FULL" | "OFF";
+        /** DoctorDetail */
+        DoctorDetail: {
+            /** Id */
+            id: number;
+            /**
+             * Name
+             * @description Họ tên kèm học hàm, ví dụ “ThS. BS. Trần Minh”
+             */
+            name: string;
+            /** Title */
+            title: string;
+            gender: components["schemas"]["Gender"];
+            specialty: components["schemas"]["SpecialtyRef"];
+            /** Services */
+            services: components["schemas"]["ServiceBrief"][];
+            /** Bio */
+            bio: string | null;
+            /**
+             * Working Hours
+             * @description Ca làm đang hiệu lực, theo giờ địa phương
+             */
+            working_hours: components["schemas"]["WorkingHours"][];
+        };
+        /** DoctorOut */
+        DoctorOut: {
+            /** Id */
+            id: number;
+            /**
+             * Name
+             * @description Họ tên kèm học hàm, ví dụ “ThS. BS. Trần Minh”
+             */
+            name: string;
+            /** Title */
+            title: string;
+            gender: components["schemas"]["Gender"];
+            specialty: components["schemas"]["SpecialtyRef"];
+            /** Services */
+            services: components["schemas"]["ServiceBrief"][];
+        };
+        /** DoctorRef */
+        DoctorRef: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** EarliestItem */
+        EarliestItem: {
+            /** Service Id */
+            service_id: number;
+            doctor: components["schemas"]["DoctorRef"];
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /**
+             * End At
+             * Format: date-time
+             */
+            end_at: string;
+        };
+        /** EarliestOut */
+        EarliestOut: {
+            /** Items */
+            items: components["schemas"]["EarliestItem"][];
         };
         /**
          * Gender
@@ -234,6 +730,325 @@ export interface components {
              */
             privacy_consent: boolean;
         };
+        /** ServiceAdminOut */
+        ServiceAdminOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            specialty: components["schemas"]["SpecialtyRef"];
+            /** Scope Description */
+            scope_description: string;
+            /** Duration Min */
+            duration_min: number;
+            /** Ref Price Vnd */
+            ref_price_vnd: number;
+            /**
+             * Doctors
+             * @description Bác sĩ đang hoạt động thực hiện dịch vụ
+             */
+            doctors: components["schemas"]["DoctorRef"][];
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Appointment Count
+             * @description Số lịch hẹn đã có; khác 0 thì chỉ ẩn được
+             */
+            appointment_count: number;
+        };
+        /** ServiceBrief */
+        ServiceBrief: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Duration Min */
+            duration_min: number;
+            /** Ref Price Vnd */
+            ref_price_vnd: number;
+        };
+        /** ServiceCreate */
+        ServiceCreate: {
+            /** Specialty Id */
+            specialty_id: number;
+            /** Name */
+            name: string;
+            /** Scope Description */
+            scope_description: string;
+            /** Duration Min */
+            duration_min: number;
+            /** Ref Price Vnd */
+            ref_price_vnd: number;
+        };
+        /** ServiceOut */
+        ServiceOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            specialty: components["schemas"]["SpecialtyRef"];
+            /** Scope Description */
+            scope_description: string;
+            /** Duration Min */
+            duration_min: number;
+            /** Ref Price Vnd */
+            ref_price_vnd: number;
+            /**
+             * Doctors
+             * @description Bác sĩ đang hoạt động thực hiện dịch vụ
+             */
+            doctors: components["schemas"]["DoctorRef"][];
+        };
+        /** ServiceRef */
+        ServiceRef: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** ServiceSummary */
+        ServiceSummary: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Duration Min */
+            duration_min: number;
+        };
+        /**
+         * ServiceUpdate
+         * @description Chỉ trường được gửi mới đổi. Đổi thời lượng không ảnh hưởng lịch đã đặt (giữ `end_at`).
+         */
+        ServiceUpdate: {
+            /** Specialty Id */
+            specialty_id?: number | null;
+            /** Name */
+            name?: string | null;
+            /** Scope Description */
+            scope_description?: string | null;
+            /** Duration Min */
+            duration_min?: number | null;
+            /** Ref Price Vnd */
+            ref_price_vnd?: number | null;
+            /** Is Active */
+            is_active?: boolean | null;
+        };
+        /** ShiftChangeOut */
+        ShiftChangeOut: {
+            /** Dry Run */
+            dry_run: boolean;
+            /** @description Ca sau khi sửa; rỗng khi xóa */
+            shift: components["schemas"]["ShiftOut"] | null;
+            /** Affected */
+            affected: components["schemas"]["AffectedOut"][];
+        };
+        /** ShiftIn */
+        ShiftIn: {
+            /**
+             * Weekday
+             * @description 1 = Thứ Hai … 7 = Chủ nhật
+             */
+            weekday: number;
+            /**
+             * Start Time
+             * Format: time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: time
+             */
+            end_time: string;
+            /**
+             * Valid From
+             * Format: date
+             */
+            valid_from: string;
+            /**
+             * Valid To
+             * @description Bỏ trống: không hết hạn
+             */
+            valid_to?: string | null;
+        };
+        /** ShiftOut */
+        ShiftOut: {
+            /** Id */
+            id: number;
+            /** Doctor Id */
+            doctor_id: number;
+            /** Weekday */
+            weekday: number;
+            /**
+             * Start Time
+             * Format: time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: time
+             */
+            end_time: string;
+            /**
+             * Valid From
+             * Format: date
+             */
+            valid_from: string;
+            /** Valid To */
+            valid_to: string | null;
+        };
+        /**
+         * ShiftUpdate
+         * @description Chỉ trường được gửi mới đổi; sau khi gộp với ca hiện tại được kiểm lại như ShiftIn.
+         */
+        ShiftUpdate: {
+            /** Weekday */
+            weekday?: number | null;
+            /** Start Time */
+            start_time?: string | null;
+            /** End Time */
+            end_time?: string | null;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid To */
+            valid_to?: string | null;
+        };
+        /** SlotOut */
+        SlotOut: {
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /**
+             * End At
+             * Format: date-time
+             */
+            end_at: string;
+            /**
+             * Doctors
+             * @description Bác sĩ còn trống ở khung này; người đầu tiên là người được chọn khi đặt với “Bác sĩ bất kỳ” (ít lịch nhất trong ngày)
+             */
+            doctors: components["schemas"]["DoctorRef"][];
+        };
+        /** SpecialtyAdminOut */
+        SpecialtyAdminOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /**
+             * Service Count
+             * @description Số dịch vụ đang hoạt động
+             */
+            service_count: number;
+            /**
+             * Doctor Count
+             * @description Số bác sĩ đang hoạt động
+             */
+            doctor_count: number;
+            /**
+             * Min Price Vnd
+             * @description Giá tham khảo thấp nhất, để hiện “từ … ₫”
+             */
+            min_price_vnd: number | null;
+            /** Is Active */
+            is_active: boolean;
+        };
+        /** SpecialtyCreate */
+        SpecialtyCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+        };
+        /** SpecialtyOut */
+        SpecialtyOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /**
+             * Service Count
+             * @description Số dịch vụ đang hoạt động
+             */
+            service_count: number;
+            /**
+             * Doctor Count
+             * @description Số bác sĩ đang hoạt động
+             */
+            doctor_count: number;
+            /**
+             * Min Price Vnd
+             * @description Giá tham khảo thấp nhất, để hiện “từ … ₫”
+             */
+            min_price_vnd: number | null;
+        };
+        /** SpecialtyRef */
+        SpecialtyRef: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /**
+         * SpecialtyUpdate
+         * @description Chỉ trường được gửi mới đổi; ẩn hoặc hiện lại bằng `is_active`.
+         */
+        SpecialtyUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+        };
+        /** TimeOffChangeOut */
+        TimeOffChangeOut: {
+            /** Dry Run */
+            dry_run: boolean;
+            /** @description Rỗng khi dry_run */
+            time_off: components["schemas"]["TimeOffOut"] | null;
+            /** Affected */
+            affected: components["schemas"]["AffectedOut"][];
+        };
+        /** TimeOffIn */
+        TimeOffIn: {
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /**
+             * End At
+             * Format: date-time
+             */
+            end_at: string;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** TimeOffOut */
+        TimeOffOut: {
+            /** Id */
+            id: number;
+            /** Doctor Id */
+            doctor_id: number;
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /**
+             * End At
+             * Format: date-time
+             */
+            end_at: string;
+            /** Reason */
+            reason: string | null;
+        };
         /** TokenResponse */
         TokenResponse: {
             /** Access Token */
@@ -281,6 +1096,24 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WorkingHours */
+        WorkingHours: {
+            /**
+             * Weekday
+             * @description 1 = Thứ Hai … 7 = Chủ nhật
+             */
+            weekday: number;
+            /**
+             * Start Time
+             * Format: time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: time
+             */
+            end_time: string;
         };
     };
     responses: never;
@@ -535,6 +1368,661 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_specialties_api_v1_specialties_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialtyOut"][];
+                };
+            };
+        };
+    };
+    search_services_api_v1_services_get: {
+        parameters: {
+            query?: {
+                /** @description Từ khóa, có dấu hoặc không dấu */
+                q?: string | null;
+                specialty_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_doctors_api_v1_doctors_get: {
+        parameters: {
+            query?: {
+                /** @description Từ khóa, có dấu hoặc không dấu */
+                q?: string | null;
+                specialty_id?: number | null;
+                service_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoctorOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_doctor_api_v1_doctors__doctor_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doctor_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoctorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_list_specialties_api_v1_admin_specialties_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialtyAdminOut"][];
+                };
+            };
+        };
+    };
+    create_specialty_api_v1_admin_specialties_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpecialtyCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialtyAdminOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_specialty_api_v1_admin_specialties__specialty_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                specialty_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpecialtyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialtyAdminOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_list_services_api_v1_admin_services_get: {
+        parameters: {
+            query?: {
+                /** @description Từ khóa, có dấu hoặc không dấu */
+                q?: string | null;
+                specialty_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceAdminOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_service_api_v1_admin_services_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceAdminOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_service_api_v1_admin_services__service_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                service_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceAdminOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_availability_api_v1_availability_get: {
+        parameters: {
+            query: {
+                service_id: number;
+                /** @description Bỏ trống: bác sĩ bất kỳ */
+                doctor_id?: number | null;
+                /** @description Mặc định: hôm nay */
+                date_from?: string | null;
+                /** @description Mặc định: bằng date_from */
+                date_to?: string | null;
+                /** @description Lọc buổi, ví dụ 07:00 */
+                time_from?: string | null;
+                /** @description Lọc buổi, ví dụ 12:00 */
+                time_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvailabilityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_earliest_api_v1_availability_earliest_get: {
+        parameters: {
+            query: {
+                service_id: number[];
+                by_doctor?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EarliestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    book_appointment_api_v1_appointments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_shifts_api_v1_admin_doctors__doctor_id__shifts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doctor_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShiftOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_shift_api_v1_admin_doctors__doctor_id__shifts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doctor_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShiftIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShiftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_shift_api_v1_admin_doctors__doctor_id__shifts__shift_id__delete: {
+        parameters: {
+            query?: {
+                /** @description true: chỉ liệt kê lịch bị ảnh hưởng, không ghi gì (UC15 bước 5) */
+                dry_run?: boolean;
+            };
+            header?: never;
+            path: {
+                doctor_id: number;
+                shift_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShiftChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_shift_api_v1_admin_doctors__doctor_id__shifts__shift_id__patch: {
+        parameters: {
+            query?: {
+                /** @description true: chỉ liệt kê lịch bị ảnh hưởng, không ghi gì (UC15 bước 5) */
+                dry_run?: boolean;
+            };
+            header?: never;
+            path: {
+                doctor_id: number;
+                shift_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShiftUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShiftChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_time_offs_api_v1_admin_doctors__doctor_id__time_offs_get: {
+        parameters: {
+            query?: {
+                /** @description Mặc định: hôm nay */
+                since?: string | null;
+            };
+            header?: never;
+            path: {
+                doctor_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeOffOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_time_off_api_v1_admin_doctors__doctor_id__time_offs_post: {
+        parameters: {
+            query?: {
+                /** @description true: chỉ liệt kê lịch bị ảnh hưởng, không ghi gì (UC15 bước 5) */
+                dry_run?: boolean;
+            };
+            header?: never;
+            path: {
+                doctor_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TimeOffIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeOffChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_time_off_api_v1_admin_doctors__doctor_id__time_offs__time_off_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doctor_id: number;
+                time_off_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
