@@ -31,7 +31,11 @@ def configure_logging(settings: Settings) -> None:
     else:
         processors = [
             *shared,
-            structlog.processors.dict_tracebacks,
+            # Traceback dạng dict nhưng KHÔNG kèm biến cục bộ (mặc định của structlog là có):
+            # biến cục bộ chứa body request, lý do khám, email của bệnh nhân (AGENTS.md).
+            structlog.processors.ExceptionRenderer(
+                structlog.tracebacks.ExceptionDictTransformer(show_locals=False)
+            ),
             structlog.processors.JSONRenderer(),
         ]
     level = logging.getLevelNamesMapping().get(settings.log_level.upper(), logging.INFO)
