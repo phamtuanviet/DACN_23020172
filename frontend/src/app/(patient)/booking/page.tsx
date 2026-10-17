@@ -1,11 +1,14 @@
-import { PagePlaceholder } from "@/shared/ui/page-placeholder";
+import type { Metadata } from "next";
+import { Suspense } from "react";
+
+import { BookingWizard } from "@/features/booking";
+
+export const metadata: Metadata = { title: "Đặt lịch" };
 
 export default function Page() {
   return (
-    <PagePlaceholder
-      sprint={2}
-      title="Đặt lịch"
-      description="Wizard dịch vụ → bác sĩ → ngày → giờ → xác nhận (UC05)."
-    />
+    <Suspense>
+      <BookingWizard />
+    </Suspense>
   );
 }
