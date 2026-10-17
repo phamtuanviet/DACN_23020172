@@ -6,7 +6,7 @@ import { CLINIC } from "@/shared/texts";
 // Biểu trưng: ô vuông bo góc màu chính với dấu cộng trắng + tên phòng khám.
 export function LogoMark({ size = 32, inverted = false }: { size?: number; inverted?: boolean }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" className="shrink-0">
       <rect width="32" height="32" rx="8" fill={inverted ? "#FFFFFF" : "#0D6B66"} />
       <path
         d="M16 9v14M9 16h14"
@@ -37,7 +37,7 @@ export function Logo({
       )}
     >
       <LogoMark inverted={inverted} />
-      <span>{CLINIC.name}</span>
+      <span className="truncate">{CLINIC.name}</span>
     </Link>
   );
 }

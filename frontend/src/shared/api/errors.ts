@@ -18,7 +18,13 @@ const MESSAGES: Record<string, string> = {
   RATE_LIMITED: "Bạn thao tác quá nhanh, vui lòng thử lại sau.",
   EMAIL_TAKEN: "Email này đã có tài khoản.",
   VALIDATION_ERROR: "Thông tin chưa hợp lệ, vui lòng kiểm tra lại các ô được đánh dấu.",
+  NOT_FOUND: "Không tìm thấy dữ liệu yêu cầu.",
+  BOOKING_WINDOW: "Chỉ đặt được lịch cho thời điểm sắp tới, trong vòng 30 ngày.",
+  SLOT_NOT_OFFERED:
+    "Giờ này không có trong lịch khám của bác sĩ, vui lòng chọn một khung giờ trống.",
+  DOCTOR_SERVICE_MISMATCH: "Bác sĩ không thực hiện dịch vụ này hoặc đã ngừng nhận lịch.",
   SLOT_TAKEN: "Khung giờ vừa được người khác đặt, vui lòng chọn khung khác.",
+  PATIENT_OVERLAP: "Bạn đã có một lịch hẹn khác trùng giờ này.",
   CHANGE_DEADLINE_PASSED: "Đã quá thời hạn đổi/hủy trực tuyến, vui lòng gọi phòng khám.",
   MAX_ACTIVE_APPOINTMENTS: "Bạn đã có 3 lịch đang chờ khám.",
   AGENT_UNAVAILABLE: "Trợ lý tạm thời không hoạt động, bạn vẫn đặt lịch được trên trang Đặt lịch.",

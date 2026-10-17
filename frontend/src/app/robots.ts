@@ -11,7 +11,11 @@ export default function robots(): MetadataRoute.Robots {
     return { rules: { userAgent: "*", disallow: "/" } };
   }
   return {
-    rules: { userAgent: "*", allow: ["/", "/services", "/doctors/"], disallow: ["/me/", "/doctor/", "/admin/"] },
+    rules: {
+      userAgent: "*",
+      allow: ["/", "/services", "/doctors/"],
+      disallow: ["/me/", "/doctor/", "/admin/"],
+    },
     host: publicBaseUrl,
   };
 }

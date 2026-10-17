@@ -893,6 +893,7 @@ frontend/
 │   │   ├── api/              # schema.d.ts (sinh từ OpenAPI) · server.ts (gọi API công khai từ server)
 │   │   │                     # · client.ts (trình duyệt: gắn token, tự refresh) · errors.ts (code → thông báo)
 │   │   ├── auth/             # authStore (Zustand) · RoleGuard
+│   │   ├── availability/     # useAvailability, useEarliest, liên kết vào wizard — dùng chung catalog và booking
 │   │   ├── ui/               # component shadcn/ui
 │   │   └── lib/              # datetime.ts (Asia/Ho_Chi_Minh) · format.ts
 │   └── features/             # auth · catalog · booking · my-appointments · agent-chat · doctor · admin

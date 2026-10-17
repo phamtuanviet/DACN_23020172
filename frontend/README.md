@@ -16,7 +16,7 @@ src/
 ├── features/<tên>/      giao diện + logic của một tính năng; bên ngoài chỉ dùng qua index.ts
 ├── shared/
 │   ├── api/               client.ts (trình duyệt), server.ts (server component), schema.d.ts (sinh tự động)
-│   ├── auth/  config/  lib/  ui/
+│   ├── auth/  availability/  config/  lib/  ui/
 └── proxy.ts             Content-Security-Policy có nonce
 ```
 

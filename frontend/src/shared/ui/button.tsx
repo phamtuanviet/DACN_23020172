@@ -6,13 +6,14 @@ import { cn } from "@/shared/lib/cn";
 
 import { Spinner } from "./spinner";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-primary text-white hover:bg-primary-hover",
   secondary:
     "border border-line-strong bg-surface text-ink hover:border-primary hover:text-primary-ink",
+  outline: "border-[1.5px] border-primary bg-surface text-primary-ink hover:bg-primary-soft",
   ghost: "text-ink hover:bg-primary-soft hover:text-primary-ink",
   danger: "border border-danger bg-surface text-danger hover:bg-danger-soft",
 };

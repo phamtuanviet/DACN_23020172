@@ -1,11 +1,12 @@
 import type { Role } from "@/shared/auth/auth-store";
 import { TEXT } from "@/shared/texts";
 
-export type NavLink = { href: string; label: string };
+/** `also`: các đường dẫn khác cũng tính là đang ở mục này (hồ sơ bác sĩ thuộc mục Bác sĩ). */
+export type NavLink = { href: string; label: string; also?: string[] };
 
 export const GUEST_LINKS: NavLink[] = [
   { href: "/services", label: TEXT.nav.services },
-  { href: "/services?tab=doctors", label: TEXT.nav.doctors },
+  { href: "/services?tab=doctors", label: TEXT.nav.doctors, also: ["/doctors"] },
   { href: "/booking", label: TEXT.nav.booking },
 ];
 
@@ -25,8 +26,17 @@ export const STAFF_LINKS: Record<Exclude<Role, "PATIENT">, NavLink[]> = {
   ],
 };
 
-/** Liên kết đang mở: so phần đường dẫn, bỏ query (Bác sĩ và Dịch vụ cùng là /services). */
+/** Liên kết đang mở: so phần đường dẫn, bỏ query. */
 export function isActive(pathname: string, href: string): boolean {
   const path = href.split("?")[0];
   return path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(`${path}/`);
+}
+
+/** Như `isActive` nhưng phân biệt hai mục cùng đường dẫn bằng `tab` (Dịch vụ và Bác sĩ cùng là
+ *  /services, khác ở ?tab=doctors). */
+export function isNavLinkActive(link: NavLink, pathname: string, search: string): boolean {
+  if (link.also?.some((path) => isActive(pathname, path))) return true;
+  if (!isActive(pathname, link.href)) return false;
+  const wanted = new URLSearchParams(link.href.split("?")[1] ?? "").get("tab");
+  return wanted === new URLSearchParams(search).get("tab");
 }
