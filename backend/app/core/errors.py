@@ -10,7 +10,8 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
+from sqlalchemy.exc import DataError, IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 log = structlog.get_logger(__name__)
@@ -25,6 +26,46 @@ class AppError(Exception):
         self.message = message
         self.status = status
         self.details = details or {}
+
+
+def violated_constraint(exc: IntegrityError) -> str | None:
+    """Tên constraint bị vi phạm (UNIQUE 23505, EXCLUDE 23P01…), để service đổi sang mã lỗi.
+
+    Ví dụ `excl_doctor_overlap` → SLOT_TAKEN, `uq_users_lower_email` → EMAIL_TAKEN (docs mục 4.7).
+    """
+    diag = getattr(exc.orig, "diag", None)
+    name = getattr(diag, "constraint_name", None)
+    return name if isinstance(name, str) else None
+
+
+def field_error(field: str, message: str, *, location: str = "body") -> AppError:
+    """Lỗi gắn với một trường, cùng dạng lỗi kiểm tra dữ liệu của Pydantic (VALIDATION_ERROR).
+
+    Frontend hiện thông báo ngay cạnh ô nhập theo `details.fields[].loc`; `location` là "body"
+    hoặc "query".
+    """
+    return AppError(
+        "VALIDATION_ERROR",
+        "Dữ liệu gửi lên không hợp lệ.",
+        status=422,
+        details={"fields": [{"loc": [location, field], "message": message}]},
+    )
+
+
+def validation_error(exc: ValidationError, *, location: str = "body") -> AppError:
+    """Lỗi Pydantic phát sinh trong service (ví dụ kiểm lại dữ liệu sau khi gộp bản sửa)."""
+    fields = [{"loc": [location, *e["loc"]], "message": e["msg"]} for e in exc.errors()]
+    return AppError(
+        "VALIDATION_ERROR", "Dữ liệu gửi lên không hợp lệ.", status=422, details={"fields": fields}
+    )
+
+
+def not_found(message: str = "Không tìm thấy dữ liệu yêu cầu.") -> AppError:
+    return AppError("NOT_FOUND", message, status=404)
+
+
+def forbidden() -> AppError:
+    return AppError("FORBIDDEN", "Bạn không có quyền thực hiện thao tác này.", status=403)
 
 
 class ErrorResponse(BaseModel):
@@ -58,6 +99,15 @@ def register_error_handlers(app: FastAPI) -> None:
     async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
         fields = [{"loc": list(e["loc"]), "message": e["msg"]} for e in exc.errors()]
         return _json(422, "VALIDATION_ERROR", "Dữ liệu gửi lên không hợp lệ.", {"fields": fields})
+
+    @app.exception_handler(DataError)
+    async def _data_error(_: Request, exc: DataError) -> JSONResponse:
+        """Database không nhận giá trị (số vượt bigint, ký tự NUL…): lỗi dữ liệu vào, trả 422.
+
+        Chỉ ghi SQLSTATE vào log: thông báo lỗi gốc có thể chứa dữ liệu bệnh nhân.
+        """
+        log.warning("data_error", sqlstate=getattr(exc.orig, "sqlstate", None))
+        return _json(422, "VALIDATION_ERROR", "Dữ liệu gửi lên không hợp lệ.")
 
     @app.exception_handler(StarletteHTTPException)
     async def _http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:

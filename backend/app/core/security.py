@@ -26,7 +26,7 @@ from app.core.actor import Actor
 from app.core.clock import Clock, get_clock
 from app.core.config import Settings, get_settings
 from app.core.db import get_sessionmaker
-from app.core.errors import AppError
+from app.core.errors import AppError, forbidden
 from app.db.enums import Channel, UserRole
 from app.db.models.users import User
 
@@ -182,7 +182,7 @@ def require_roles(*roles: UserRole) -> Callable[[CurrentUser], Awaitable[Current
 
     async def checker(user: CurrentUserDep) -> CurrentUser:
         if user.role not in roles:
-            raise AppError("FORBIDDEN", "Bạn không có quyền thực hiện thao tác này.", status=403)
+            raise forbidden()
         return user
 
     return checker
@@ -198,4 +198,16 @@ async def get_actor(user: CurrentUserDep) -> Actor:
     return actor_of(user)
 
 
+def actor_with_roles(*roles: UserRole) -> Callable[[CurrentUser], Awaitable[Actor]]:
+    """Như `require_roles` nhưng trả luôn `Actor` để router truyền vào service."""
+    checker = require_roles(*roles)
+
+    async def dependency(user: Annotated[CurrentUser, Depends(checker)]) -> Actor:
+        return actor_of(user)
+
+    return dependency
+
+
 ActorDep = Annotated[Actor, Depends(get_actor)]
+AdminActorDep = Annotated[Actor, Depends(actor_with_roles(UserRole.ADMIN))]
+PatientActorDep = Annotated[Actor, Depends(actor_with_roles(UserRole.PATIENT))]

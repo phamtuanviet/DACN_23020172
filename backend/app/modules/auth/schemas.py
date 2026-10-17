@@ -11,6 +11,7 @@ from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, Field, field_validator
 from pydantic_core import PydanticCustomError
 
+from app.core.validation import no_nul
 from app.db.enums import Gender, UserRole
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -19,7 +20,7 @@ PASSWORD_MIN_LENGTH = 8
 
 
 def _email(value: str) -> str:
-    value = value.strip().lower()
+    value = no_nul(value).strip().lower()
     if not _EMAIL.match(value):
         raise PydanticCustomError("email", "Email không hợp lệ.")
     return value
@@ -36,7 +37,7 @@ def _phone(value: str) -> str:
 
 
 def _full_name(value: str) -> str:
-    value = " ".join(value.split())
+    value = " ".join(no_nul(value).split())
     if len(value) < 2:
         raise PydanticCustomError("full_name", "Họ tên cần ít nhất 2 ký tự.")
     return value

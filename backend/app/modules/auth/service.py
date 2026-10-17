@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.actor import Actor
 from app.core.clock import Clock
 from app.core.config import Settings
-from app.core.errors import AppError
+from app.core.errors import AppError, field_error, violated_constraint
 from app.core.security import (
     create_access_token,
     hash_password_async,
@@ -87,16 +87,6 @@ def email_taken() -> AppError:
     return AppError("EMAIL_TAKEN", "Email này đã có tài khoản.", status=409)
 
 
-def field_error(field: str, message: str) -> AppError:
-    """Cùng dạng với lỗi kiểm tra dữ liệu của Pydantic, để frontend hiện cạnh đúng ô nhập."""
-    return AppError(
-        "VALIDATION_ERROR",
-        "Dữ liệu gửi lên không hợp lệ.",
-        status=422,
-        details={"fields": [{"loc": ["body", field], "message": message}]},
-    )
-
-
 # ---------------------------------------------------------------------------- dùng chung
 async def create_user(
     session: AsyncSession,
@@ -124,8 +114,7 @@ async def create_user(
     try:
         await session.flush()
     except IntegrityError as exc:
-        diag = getattr(exc.orig, "diag", None)
-        if getattr(diag, "constraint_name", None) == EMAIL_UNIQUE_INDEX:
+        if violated_constraint(exc) == EMAIL_UNIQUE_INDEX:
             raise email_taken() from exc
         raise
     return user
