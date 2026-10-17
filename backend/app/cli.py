@@ -55,6 +55,27 @@ def seed() -> None:
         print("Tài khoản demo (@demo.local) dùng mật khẩu vừa nhập.")
 
 
+def seed_appointments() -> None:
+    """Thêm lịch hẹn mẫu vào database đã nạp seed trước khi có AppointmentService."""
+    settings = get_settings()
+    if not settings.seed_allowed:
+        sys.exit("Từ chối: không nạp dữ liệu giả ở production (docs mục 7.5).")
+    from app.db.seed import seed_appointments as run_seed
+
+    async def run() -> int:
+        try:
+            async with get_sessionmaker()() as session:
+                return await run_seed(session, SystemClock())
+        finally:
+            await get_engine().dispose()
+
+    try:
+        count = asyncio.run(run())
+    except RuntimeError as exc:
+        sys.exit(f"Bỏ qua: {exc}")
+    print(f"Đã thêm {count} lịch hẹn mẫu.")
+
+
 def _ask_password(purpose: str) -> str:
     """Nhập mật khẩu tương tác (không qua tham số dòng lệnh), kiểm tra theo FR-AUTH-01."""
     from app.modules.auth.schemas import Password
@@ -110,6 +131,7 @@ def main(argv: list[str] | None = None) -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("export-openapi", help="Xuất OpenAPI ra file").add_argument("output", type=Path)
     sub.add_parser("seed", help="Nạp dữ liệu giả (development, staging)")
+    sub.add_parser("seed-appointments", help="Thêm lịch hẹn mẫu vào database đã có seed")
     sub.add_parser("create-admin", help="Tạo tài khoản quản trị đầu tiên").add_argument(
         "--email", required=True
     )
@@ -121,6 +143,8 @@ def main(argv: list[str] | None = None) -> None:
             export_openapi(args.output)
         case "seed":
             seed()
+        case "seed-appointments":
+            seed_appointments()
         case "create-admin":
             create_admin(args.email)
         case "import-catalog":

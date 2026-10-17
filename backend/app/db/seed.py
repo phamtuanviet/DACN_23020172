@@ -2,20 +2,25 @@
 
 Tên bác sĩ, dịch vụ, giá khớp với thiết kế giao diện để demo nhất quán. Mọi mốc thời gian tính
 tương đối so với ngày chạy seed; dữ liệu ngẫu nhiên dùng seed cố định nên chạy lại ra kết quả như
-cũ. Lịch hẹn mẫu sẽ được thêm khi có AppointmentService (Sprint 2–3), để đi qua đúng mọi quy tắc.
+cũ. Lịch hẹn mẫu đặt qua chính AppointmentService nên tuân theo mọi quy tắc đặt lịch; hiện có lịch
+BOOKED sắp tới, lịch đã qua (COMPLETED, NO_SHOW, CANCELLED) thêm khi có máy trạng thái (Sprint 3).
 """
 
 import random
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.actor import Actor
 from app.core.clock import Clock
+from app.core.config import get_settings
+from app.core.errors import AppError
 from app.core.security import hash_password_async
 from app.core.timeutil import local_datetime, to_local
-from app.db.enums import Gender, UserRole
+from app.db.enums import Channel, Gender, UserRole
+from app.db.models.appointments import Appointment, Notification
 from app.db.models.catalog import DoctorService, Service, Specialty
 from app.db.models.schedule import Shift, TimeOff
 from app.db.models.users import Doctor, PatientProfile, User
@@ -269,6 +274,18 @@ GIVEN_NAMES = {
     F: ["Lan", "Hoa", "Hương", "Linh", "Trang", "Thảo", "Yến", "Nhung", "Vy", "Hằng"],
 }
 
+APPOINTMENT_PATIENTS = 40  # số bệnh nhân mẫu có lịch sắp tới
+REASONS: list[str | None] = [
+    "Nổi mẩn đỏ ở tay",
+    "Ho và sổ mũi 3 ngày",
+    "Khám định kỳ",
+    "Đau họng khi nuốt",
+    "Mỏi mắt khi làm việc với máy tính",
+    "Đau răng hàm dưới",
+    None,
+    None,
+]
+
 MORNING = (time(8, 0), time(11, 30))
 AFTERNOON = (time(13, 30), time(17, 0))
 
@@ -315,6 +332,7 @@ async def seed_database(
         time_off_count = _seed_time_offs(session, doctor_ids, today, created_by=admins[0].id)
         patient_count = await _seed_patients(session, password_hash, rng, now)
 
+    appointment_count = await seed_appointments(session, clock)
     return {
         "chuyên khoa": len(specialties),
         "dịch vụ": len(services),
@@ -323,7 +341,70 @@ async def seed_database(
         "ngày nghỉ": time_off_count,
         "bệnh nhân": patient_count,
         "quản trị": len(admins),
+        "lịch hẹn": appointment_count,
     }
+
+
+async def seed_appointments(session: AsyncSession, clock: Clock) -> int:
+    """Lịch BOOKED trong 2 tuần tới, đặt qua AppointmentService như bệnh nhân thật.
+
+    Chạy được riêng trên database đã có danh mục, bác sĩ, bệnh nhân mẫu nhưng chưa có lịch hẹn
+    (lệnh `seed-appointments`). Không tạo email xác nhận: địa chỉ @demo.local không có thật.
+    """
+    from app.modules.appointments.schemas import BookRequest
+    from app.modules.appointments.service import AppointmentService
+    from app.modules.scheduling.service import AvailabilityQuery, SchedulingService
+
+    async with session.begin():
+        if (await session.execute(select(func.count()).select_from(Appointment))).scalar_one():
+            raise RuntimeError("Database đã có lịch hẹn; bỏ qua lịch hẹn mẫu.")
+        patients = list(
+            (
+                await session.execute(
+                    select(User.id)
+                    .where(User.role == UserRole.PATIENT, User.email.like("%@demo.local"))
+                    .order_by(User.id)
+                )
+            ).scalars()
+        )
+        services = list(
+            (
+                await session.execute(
+                    select(Service.id).where(Service.is_active.is_(True)).order_by(Service.id)
+                )
+            ).scalars()
+        )
+
+    settings = get_settings()
+    scheduling = SchedulingService(session, clock, settings)
+    booking = AppointmentService(session, clock, settings)
+    rng = random.Random(RANDOM_SEED + 1)
+    today = to_local(clock.now()).date()
+    booked: list[int] = []
+    for patient_id in patients[:APPOINTMENT_PATIENTS]:
+        for _ in range(rng.choice([1, 1, 2])):
+            service_id = rng.choice(services)
+            day = today + timedelta(days=rng.randint(0, 13))
+            result = await scheduling.availability(AvailabilityQuery(service_id, date_from=day))
+            slots = result.days[0].slots
+            if not slots:
+                continue
+            slot = rng.choice(slots)
+            channel = Channel.AGENT if rng.random() < 0.3 else Channel.WEB
+            request = BookRequest(
+                service_id=service_id,
+                doctor_id=slot.doctors[0].id,
+                start_at=slot.start_at,
+                reason=rng.choice(REASONS),
+            )
+            try:
+                created = await booking.book(Actor(patient_id, UserRole.PATIENT, channel), request)
+            except AppError:  # trùng giờ với lịch khác của chính bệnh nhân: bỏ qua
+                continue
+            booked.append(created.id)
+    async with session.begin():
+        await session.execute(delete(Notification).where(Notification.appointment_id.in_(booked)))
+    return len(booked)
 
 
 async def _seed_doctors(

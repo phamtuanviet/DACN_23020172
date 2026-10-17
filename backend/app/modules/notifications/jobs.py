@@ -8,7 +8,8 @@ log = structlog.get_logger(__name__)
 async def send_notifications() -> None:
     """Gửi email PENDING đến hạn: mỗi email một transaction, FOR UPDATE SKIP LOCKED.
 
-    Xem docs mục 10.5.
+    Xem docs mục 10.5. Ngoài development, bỏ qua địa chỉ thuộc tên miền .local (tài khoản demo
+    @demo.local, RFC 6762): gửi qua SES sẽ bị trả về và làm giảm uy tín tên miền gửi.
     """
     log.debug("job.todo", job="send_notifications")
 

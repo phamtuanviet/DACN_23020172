@@ -8,7 +8,7 @@ FastAPI, modular monolith (docs mục 4). Python 3.12, quản lý gói bằng `u
 app/
 ├── main.py          create_app(): điểm vào duy nhất của HTTP
 ├── worker.py        tiến trình tác vụ nền (APScheduler)
-├── cli.py           lệnh quản trị: export-openapi, seed, create-admin, import-catalog
+├── cli.py           lệnh quản trị: export-openapi, seed, seed-appointments, create-admin, import-catalog
 ├── api/             router gốc /api/v1 và health check — chỉ ghép router, không có nghiệp vụ
 ├── core/            dùng chung: config, db, errors, logging, clock, security…
 ├── db/              Base, enum, model ORM (models/), seed
