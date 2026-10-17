@@ -368,7 +368,7 @@ Thuật toán (FR-SCH-01, 02, 03):
 
 Ví dụ: ca 08:00–11:30, dịch vụ 20 phút, đã có lịch 08:40–09:10. Kết quả: 08:00, 08:20, 09:10, 09:30, 09:50, 10:10, 10:30, 10:50, 11:10. Khung 08:20–08:40 hợp lệ vì khoảng `[)` cho phép hai lịch nằm sát nhau.
 
-**Nạp dữ liệu.** Service nạp đủ dữ liệu cho cả khoảng ngày bằng 3 truy vấn, mỗi truy vấn dùng một chỉ mục của ERD mục 5.3: (1) bác sĩ đang hoạt động thực hiện dịch vụ, kèm ca làm (`shifts (doctor_id, weekday)`); (2) ngày nghỉ chồng khoảng (`time_offs (doctor_id, start_at)`); (3) lịch BOOKED/ARRIVED chồng khoảng (`appointments (doctor_id, start_at)`). Trường hợp nặng nhất là 20 bác sĩ × 30 ngày × khoảng 30 khung/ngày, tức chừng 18.000 khung ứng viên; Python xử lý trong vài chục mili giây, nên ước tính p95 còn cách xa ngưỡng 500 ms của NFR-01. Con số thật được đo bằng k6 ở tuần 7.
+**Nạp dữ liệu.** Service nạp đủ dữ liệu cho cả khoảng ngày bằng 3 truy vấn, mỗi truy vấn dùng một chỉ mục của ERD mục 5.3: (1) bác sĩ đang hoạt động thực hiện dịch vụ, kèm ca làm (`shifts (doctor_id, weekday)`); (2) ngày nghỉ chồng khoảng (`time_offs (doctor_id, start_at)`); (3) lịch BOOKED/ARRIVED chồng khoảng (`appointments (doctor_id, start_at)`), thêm điều kiện `start_at > đầu khoảng − 120 phút` (một lịch dài tối đa 120 phút) để chỉ mục không phải quét cả lịch sử cũ của bác sĩ. Truy vấn (1) dùng LEFT JOIN ca làm, nên bác sĩ chưa có ca vẫn được nhận ra là có thực hiện dịch vụ. Trường hợp nặng nhất là 20 bác sĩ × 30 ngày × khoảng 30 khung/ngày, tức chừng 18.000 khung ứng viên; Python xử lý trong vài chục mili giây, nên ước tính p95 còn cách xa ngưỡng 500 ms của NFR-01. Con số thật được đo bằng k6 ở tuần 7.
 
 **Bác sĩ bất kỳ (UC05 2a).** Khi không truyền `doctor_id`, kết quả được gộp theo giờ bắt đầu, mỗi khung kèm danh sách bác sĩ còn trống. Khi đặt, service chọn bác sĩ có ít lịch nhất trong ngày; nếu gặp `SLOT_TAKEN` thì thử bác sĩ kế tiếp trong danh sách trước khi báo lỗi.
 
@@ -376,12 +376,17 @@ Ví dụ: ca 08:00–11:30, dịch vụ 20 phút, đã có lịch 08:40–09:10.
 
 - **Ngày gần nhất (FR-SCH-05, UC05 4a).** Nếu khoảng ngày được hỏi không còn khung, Engine quét tiếp từng ngày tới hết cửa sổ 30 ngày và trả `nearest_dates` gồm tối đa 3 ngày còn khung, dừng ngay khi đủ 3.
 - **Phương án thay thế cho Agent (FR-AGT-05, UC09 4a).** Kết quả của `find_available_slots` có thêm `alternatives`, tối đa 3 phương án theo thứ tự: buổi khác cùng ngày, ngày gần nhất còn khung đúng buổi, bác sĩ khác cùng dịch vụ (khi bệnh nhân đã chỉ định bác sĩ). Tính sẵn ở backend nên LLM chỉ cần trình bày, không phải tự dò qua nhiều lượt gọi tool — vừa nhanh vừa ít tốn token.
+- **Khung thay thế khi `SLOT_TAKEN` (BR-03).** Tối đa 3 khung còn trống gần giờ đã chọn nhất, tính theo khoảng cách thời gian (trước hoặc sau giờ đó), cùng bác sĩ nếu đã chọn bác sĩ; tìm trong 7 ngày kể từ ngày đã chọn, chưa đủ mới quét tới hết cửa sổ 30 ngày.
+- **Khung sớm nhất.** `GET /availability/earliest` trả khung trống sớm nhất trong 30 ngày của từng dịch vụ, hoặc của từng bác sĩ (`by_doctor=true`), cho các dòng "Sớm nhất" ở trang dịch vụ, hồ sơ bác sĩ và bước chọn bác sĩ. Một request phục vụ cả trang: dữ liệu của mọi dịch vụ được hỏi nạp một lần, Engine đi lần lượt từng ngày và dừng khi mọi bác sĩ đã có khung.
+- **Trạng thái ngày.** Mỗi ngày trong kết quả `/availability` có `status`: `OPEN` (còn khung), `FULL` (có giờ làm nhưng đã kín hoặc đã qua giờ), `OFF` (không có ca, hoặc ngày nghỉ phủ kín ca), để giao diện hiện "N giờ trống", "Hết chỗ", "Nghỉ".
 
 ### 5.3 Kiểm tra khi ghi
 
 Exclusion constraint chỉ biết hai lịch có chồng nhau hay không; nó không biết ca làm và ngày nghỉ. Vì vậy trước khi INSERT hoặc UPDATE, service gọi `ensure_slot_bookable(doctor, service, start_at)`: tính khung của đúng bác sĩ đó trong ngày đó bằng `compute_slots`, rồi kiểm tra `start_at` có trong danh sách hay không. Khi đổi lịch, chính lịch đang đổi được loại khỏi danh sách khoảng bận.
 
 Quy tắc này chặt hơn ERD một chút: giờ bắt đầu phải trùng một khung do Engine sinh ra. Nhờ vậy web, Agent và quản trị luôn dùng chung một lưới giờ, và không ai đặt được giờ "tự nghĩ ra", kể cả khi gọi API trực tiếp hay khi LLM bịa giờ.
+
+Khi `start_at` không có trong danh sách, service phân biệt hai trường hợp bằng cách tính lại lưới chỉ với ca làm và ngày nghỉ (bỏ các lịch hẹn): nếu giờ đó nằm trên lưới này, tức khung từng được hiển thị nhưng vừa có người đặt (hoặc lưới đã dịch sau một lịch vừa đặt), thì trả `409 SLOT_TAKEN` kèm khung thay thế; ngược lại trả `400 SLOT_NOT_OFFERED`. Nhờ vậy cả 20 request tranh cùng một khung đều nhận `SLOT_TAKEN`, dù request đến sau thấy lịch đã commit ngay ở bước kiểm tra chứ chưa tới INSERT (AC-03).
 
 ### 5.4 Transaction đặt, đổi, hủy
 
@@ -714,8 +719,9 @@ API là REST + JSON với tiền tố `/api/v1`, một bộ endpoint dùng chung
 | `GET /specialties` | Công khai | Chuyên khoa đang hoạt động | FR-CAT-04 |
 | `GET /services?q=&specialty_id=` | Công khai | Tìm dịch vụ có dấu và không dấu | FR-CAT-04 |
 | `GET /doctors?q=&specialty_id=&service_id=` | Công khai | Tìm bác sĩ | FR-CAT-04 |
-| `GET /doctors/{id}` (mới) | Công khai | Hồ sơ bác sĩ, dịch vụ, điểm đánh giá trung bình (P2) | UC03, FR-RPT-03 |
+| `GET /doctors/{id}` (mới) | Công khai | Hồ sơ bác sĩ, dịch vụ, lịch làm việc trong tuần, điểm đánh giá trung bình (P2) | UC03, FR-RPT-03 |
 | `GET /availability?service_id=&doctor_id=&date_from=&date_to=&time_from=&time_to=` | Công khai | Khung trống theo ngày, kèm `nearest_dates` | FR-SCH-01..05 |
+| `GET /availability/earliest?service_id=&by_doctor=` (mới) | Công khai | Khung trống sớm nhất trong 30 ngày của từng dịch vụ (lặp `service_id`, tối đa 50) hoặc từng bác sĩ (mục 5.2) | FR-SCH-05 |
 
 **Lịch hẹn**
 
@@ -771,6 +777,7 @@ GET /api/v1/availability?service_id=3&date_from=2026-10-17&date_to=2026-10-17&ti
   "days": [
     {
       "date": "2026-10-17",
+      "status": "OPEN",
       "slots": [
         {
           "start_at": "2026-10-17T08:00:00+07:00",
