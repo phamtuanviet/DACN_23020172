@@ -439,7 +439,7 @@ COMMIT
 
 **Hủy lịch** (UC07): khóa dòng, kiểm tra như đổi lịch, rồi `UPDATE status = CANCELLED, cancel_reason, needs_attention = false`, ghi history `CANCEL` và email `CANCELLED`. Khung giờ được trả lại ngay vì constraint chỉ áp cho BOOKED/ARRIVED.
 
-Service gọi `session.flush()` ngay sau INSERT/UPDATE để lỗi constraint nổi lên đúng chỗ và được chuyển thành `AppError`, thay vì bật ra lúc COMMIT ở tầng ngoài.
+Service gọi `session.flush()` ngay sau INSERT/UPDATE để lỗi constraint nổi lên đúng chỗ và được chuyển thành `AppError`, thay vì bật ra lúc COMMIT ở tầng ngoài. Mỗi lần INSERT lịch hẹn chạy trong một SAVEPOINT, nên lỗi constraint không làm hỏng cả transaction: đặt với "Bác sĩ bất kỳ" mà gặp `excl_doctor_overlap` thì thử bác sĩ kế tiếp ngay trong transaction đó; trùng `uq_appointments_code` thì sinh mã khác (mục 5.6).
 
 ### 5.5 Trạng thái lịch hẹn
 
@@ -652,7 +652,7 @@ Các chỉ mục bổ sung so với ERD (dòng đánh dấu ở trên và hai ch
 | --- | --- |
 | Bảng `refresh_tokens` (id uuid PK, user_id FK ON DELETE CASCADE, token_hash varchar(64) UNIQUE, family_id uuid, expires_at, revoked_at, replaced_by uuid, created_at, user_agent varchar(255), ip inet) | Thu hồi và xoay vòng refresh token (TD-07); thay quyết định "không có bảng refresh token" ở ERD mục 6 |
 | Cột `users.privacy_consent_at` (timestamptz) | Lưu thời điểm bệnh nhân đồng ý chính sách xử lý dữ liệu khi đăng ký (mục 11.8) |
-| Cột `users.anonymized_at` (timestamptz) | Đánh dấu tài khoản đã ẩn danh hóa theo yêu cầu xóa: họ tên, email, số điện thoại, ngày sinh bị thay bằng giá trị vô danh; lịch hẹn giữ lại cho thống kê nhưng không còn định danh được |
+| Cột `users.anonymized_at` (timestamptz) | Đánh dấu tài khoản đã ẩn danh hóa theo yêu cầu xóa: họ tên, email, số điện thoại, ngày sinh bị thay bằng giá trị vô danh; lịch hẹn giữ lại cho thống kê nhưng không còn định danh được; bản sao email trong `notifications.recipient_email` và các cột chữ tự do của lịch hẹn (`reason`, `cancel_reason`, `doctor_note`) cũng bị xóa |
 | Chỉ mục `conversations (patient_id, last_message_at DESC)` | Đếm hạn mức tin nhắn, mở lại hội thoại gần nhất |
 | Chỉ mục `refresh_tokens (user_id)`, `refresh_tokens (expires_at)` | Thu hồi theo người dùng; job dọn token hết hạn |
 
