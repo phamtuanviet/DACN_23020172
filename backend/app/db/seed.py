@@ -2,13 +2,17 @@
 
 Tên bác sĩ, dịch vụ, giá khớp với thiết kế giao diện để demo nhất quán. Mọi mốc thời gian tính
 tương đối so với ngày chạy seed; dữ liệu ngẫu nhiên dùng seed cố định nên chạy lại ra kết quả như
-cũ. Lịch hẹn mẫu đặt qua chính AppointmentService nên tuân theo mọi quy tắc đặt lịch; hiện có lịch
-BOOKED sắp tới, lịch đã qua (COMPLETED, NO_SHOW, CANCELLED) thêm khi có máy trạng thái (Sprint 3).
+cũ. Lịch hẹn mẫu đặt, đổi, hủy, cập nhật trạng thái qua chính AppointmentService nên tuân theo
+mọi quy tắc nghiệp vụ và có lịch sử thay đổi như dữ liệu thật.
 """
 
+import contextlib
+import heapq
+import itertools
 import random
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from typing import TYPE_CHECKING
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,11 +23,14 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.security import hash_password_async
 from app.core.timeutil import local_datetime, to_local
-from app.db.enums import Channel, Gender, UserRole
+from app.db.enums import AppointmentStatus, Channel, Gender, UserRole
 from app.db.models.appointments import Appointment, Notification
 from app.db.models.catalog import DoctorService, Service, Specialty
 from app.db.models.schedule import Shift, TimeOff
 from app.db.models.users import Doctor, PatientProfile, User
+
+if TYPE_CHECKING:  # module nghiệp vụ chỉ nạp khi seed lịch hẹn
+    from app.modules.appointments.schemas import AppointmentOut
 
 # Mật khẩu chung của tài khoản @demo.local CHỈ ở development. Staging công khai trên Internet nên
 # lệnh seed hỏi mật khẩu khi chạy, không dùng giá trị nằm trong repo (gồm cả tài khoản quản trị).
@@ -274,7 +281,14 @@ GIVEN_NAMES = {
     F: ["Lan", "Hoa", "Hương", "Linh", "Trang", "Thảo", "Yến", "Nhung", "Vy", "Hằng"],
 }
 
-APPOINTMENT_PATIENTS = 40  # số bệnh nhân mẫu có lịch sắp tới
+APPOINTMENT_PATIENTS = 45  # số bệnh nhân mẫu có lịch sắp tới
+PAST_PATIENTS = 50  # số bệnh nhân mẫu có lịch đã qua (Đã khám, Vắng mặt, Đã hủy)
+CANCEL_REASONS: list[str | None] = [
+    "Bận việc đột xuất",
+    "Đã khỏi, không cần khám",
+    "Đặt nhầm giờ",
+    None,
+]
 REASONS: list[str | None] = [
     "Nổi mẩn đỏ ở tay",
     "Ho và sổ mũi 3 ngày",
@@ -346,15 +360,15 @@ async def seed_database(
 
 
 async def seed_appointments(session: AsyncSession, clock: Clock) -> int:
-    """Lịch BOOKED trong 2 tuần tới, đặt qua AppointmentService như bệnh nhân thật.
+    """Lịch hẹn mẫu, đặt và xử lý qua chính AppointmentService như người dùng thật.
+
+    - Lịch đã qua trong 2 tuần trước: đặt "lúc đó" bằng đồng hồ tua lùi, rồi đi hết vòng đời
+      (Đã khám, Vắng mặt, Đã hủy) nên lịch sử thay đổi có mốc thời gian hợp lý.
+    - Lịch sắp tới trong 2 tuần tới; một phần được bệnh nhân đổi giờ hoặc hủy.
 
     Chạy được riêng trên database đã có danh mục, bác sĩ, bệnh nhân mẫu nhưng chưa có lịch hẹn
-    (lệnh `seed-appointments`). Không tạo email xác nhận: địa chỉ @demo.local không có thật.
+    (lệnh `seed-appointments`). Không tạo email: địa chỉ @demo.local không có thật.
     """
-    from app.modules.appointments.schemas import BookRequest
-    from app.modules.appointments.service import AppointmentService
-    from app.modules.scheduling.service import AvailabilityQuery, SchedulingService
-
     async with session.begin():
         if (await session.execute(select(func.count()).select_from(Appointment))).scalar_one():
             raise RuntimeError("Database đã có lịch hẹn; bỏ qua lịch hẹn mẫu.")
@@ -375,36 +389,209 @@ async def seed_appointments(session: AsyncSession, clock: Clock) -> int:
             ).scalars()
         )
 
-    settings = get_settings()
-    scheduling = SchedulingService(session, clock, settings)
-    booking = AppointmentService(session, clock, settings)
     rng = random.Random(RANDOM_SEED + 1)
-    today = to_local(clock.now()).date()
-    booked: list[int] = []
-    for patient_id in patients[:APPOINTMENT_PATIENTS]:
-        for _ in range(rng.choice([1, 1, 2])):
-            service_id = rng.choice(services)
-            day = today + timedelta(days=rng.randint(0, 13))
-            result = await scheduling.availability(AvailabilityQuery(service_id, date_from=day))
-            slots = result.days[0].slots
-            if not slots:
-                continue
-            slot = rng.choice(slots)
-            channel = Channel.AGENT if rng.random() < 0.3 else Channel.WEB
-            request = BookRequest(
-                service_id=service_id,
-                doctor_id=slot.doctors[0].id,
-                start_at=slot.start_at,
-                reason=rng.choice(REASONS),
-            )
-            try:
-                created = await booking.book(Actor(patient_id, UserRole.PATIENT, channel), request)
-            except AppError:  # trùng giờ với lịch khác của chính bệnh nhân: bỏ qua
-                continue
-            booked.append(created.id)
+    seeder = _AppointmentSeeder(session, clock, services, rng)
+    past = await seeder.past(patients[:PAST_PATIENTS])
+    upcoming = await seeder.upcoming(patients[:APPOINTMENT_PATIENTS])
+    created = past + upcoming
     async with session.begin():
-        await session.execute(delete(Notification).where(Notification.appointment_id.in_(booked)))
-    return len(booked)
+        await session.execute(delete(Notification).where(Notification.appointment_id.in_(created)))
+    return len(created)
+
+
+@dataclass
+class _SeedClock:
+    """Đồng hồ tua được của seed: service đọc giờ qua đây nên lịch đã qua có mốc thời gian thật."""
+
+    at: datetime
+
+    def now(self) -> datetime:
+        return self.at
+
+
+def _weekday(day: date, *, step: int) -> date:
+    """Phòng khám nghỉ Chủ nhật: dời sang ngày liền kề theo hướng `step`."""
+    return day + timedelta(days=step) if day.isoweekday() == 7 else day
+
+
+@dataclass(frozen=True)
+class _Event:
+    """Một việc trên dòng thời gian của seed: đặt lịch, hoặc cập nhật một lịch đã đặt."""
+
+    at: datetime
+    action: str  # book, cancel, arrive, complete, no_show
+    patient_id: int
+    appointment: "AppointmentOut | None" = None
+    day: date | None = None
+
+
+class _AppointmentSeeder:
+    def __init__(
+        self, session: AsyncSession, clock: Clock, services: list[int], rng: random.Random
+    ) -> None:
+        from app.modules.appointments.service import AppointmentService
+        from app.modules.scheduling.service import SchedulingService
+
+        settings = get_settings()
+        self._now = clock.now()
+        self._clock = _SeedClock(self._now)
+        self._scheduling = SchedulingService(session, self._clock, settings)
+        self._appointments = AppointmentService(session, self._clock, settings)
+        self._services = services
+        self._rng = rng
+
+    async def past(self, patients: list[int]) -> list[int]:
+        """Mô phỏng 2 tuần trước theo dòng thời gian: mỗi việc (đặt, đến, khám xong, vắng mặt,
+        hủy) chạy đúng thứ tự với đồng hồ tua tới lúc đó, nên giới hạn 3 lịch, khung trống, hạn
+        hủy 2 giờ đều được kiểm như thật; khung bị hủy trả lại cho người đặt sau."""
+        today = to_local(self._now).date()
+        queue: list[tuple[datetime, int, _Event]] = []
+        order = itertools.count()  # cùng thời điểm thì việc nào lên lịch trước chạy trước
+
+        def schedule(event: _Event) -> None:
+            heapq.heappush(queue, (event.at, next(order), event))
+
+        created: list[int] = []
+        for index, patient_id in enumerate(patients):
+            # tài khoản demo (bệnh nhân đầu tiên) luôn có đủ lịch sử để demo
+            for _ in range(3 if index == 0 else self._rng.choice([2, 2, 3, 3, 4])):
+                day = _weekday(today - timedelta(days=self._rng.randint(1, 13)), step=-1)
+                # đặt trước 1–6 ngày, trong khoảng 07:00–21:00
+                booked_at = local_datetime(
+                    day - timedelta(days=self._rng.randint(1, 6)), time(7)
+                ) + timedelta(minutes=self._rng.randint(0, 14 * 60))
+                schedule(_Event(booked_at, "book", patient_id, day=day))
+
+        while queue:
+            at, _, event = heapq.heappop(queue)
+            self._clock.at = at
+            if event.action == "book" and event.day is not None:
+                appointment = await self._book(event.patient_id, event.day)
+                if appointment is not None:
+                    created.append(appointment.id)
+                    schedule(self._outcome(appointment, event.patient_id, booked_at=at))
+            elif event.appointment is not None:
+                follow_up = await self._apply(event)
+                if follow_up is not None:
+                    schedule(follow_up)
+        return created
+
+    def _outcome(
+        self, appointment: "AppointmentOut", patient_id: int, *, booked_at: datetime
+    ) -> "_Event":
+        """Kết quả buổi khám: khoảng 70% đã khám, 10% vắng mặt, 20% bệnh nhân hủy trước."""
+        roll = self._rng.random()
+        cancel_at = appointment.start_at - timedelta(hours=self._rng.randint(3, 36))
+        if roll < 0.2 and cancel_at > booked_at:
+            return _Event(cancel_at, "cancel", patient_id, appointment=appointment)
+        if roll < 0.3:
+            return _Event(
+                appointment.start_at + timedelta(minutes=20), "no_show", patient_id, appointment
+            )
+        return _Event(
+            appointment.start_at - timedelta(minutes=10), "arrive", patient_id, appointment
+        )
+
+    async def _apply(self, event: "_Event") -> "_Event | None":
+        """Thực hiện một việc của bác sĩ hoặc bệnh nhân; trả việc kế tiếp nếu có."""
+        from app.modules.appointments.schemas import StatusChangeRequest
+
+        appointment = event.appointment
+        assert appointment is not None
+        if event.action == "cancel":
+            await self._cancel(event.patient_id, appointment.id)
+            return None
+        doctor = Actor(appointment.doctor.id, UserRole.DOCTOR, Channel.WEB)
+        status = {
+            "no_show": AppointmentStatus.NO_SHOW,
+            "arrive": AppointmentStatus.ARRIVED,
+            "complete": AppointmentStatus.COMPLETED,
+        }[event.action]
+        await self._appointments.change_status(
+            doctor, appointment.id, StatusChangeRequest(status=status)
+        )
+        if event.action == "arrive":
+            return _Event(appointment.end_at, "complete", event.patient_id, appointment)
+        return None
+
+    async def upcoming(self, patients: list[int]) -> list[int]:
+        self._clock.at = self._now
+        today = to_local(self._now).date()
+        created: list[int] = []
+        for index, patient_id in enumerate(patients):
+            wanted = 2 if index == 0 else self._rng.choice([1, 2, 2, 3])
+            booked = 0
+            # tài khoản demo thử lại tới khi đủ 2 lịch; người khác bỏ qua lượt không đặt được
+            for _ in range(wanted * 3 if index == 0 else wanted):
+                if booked == wanted:
+                    break
+                day = _weekday(today + timedelta(days=self._rng.randint(1, 13)), step=1)
+                appointment = await self._book(patient_id, day)
+                if appointment is None:
+                    continue
+                booked += 1
+                created.append(appointment.id)
+                roll = self._rng.random()
+                if index == 0:  # lịch của tài khoản demo giữ nguyên để demo đổi, hủy
+                    continue
+                if roll < 0.15:
+                    await self._reschedule(patient_id, appointment)
+                elif roll < 0.25:
+                    await self._cancel(patient_id, appointment.id)
+        return created
+
+    async def _book(self, patient_id: int, day: date) -> "AppointmentOut | None":
+        from app.modules.appointments.schemas import BookRequest
+        from app.modules.scheduling.service import AvailabilityQuery
+
+        service_id = self._rng.choice(self._services)
+        result = await self._scheduling.availability(AvailabilityQuery(service_id, date_from=day))
+        slots = result.days[0].slots
+        if not slots:
+            return None
+        slot = self._rng.choice(slots)
+        channel = Channel.AGENT if self._rng.random() < 0.3 else Channel.WEB
+        request = BookRequest(
+            service_id=service_id,
+            doctor_id=slot.doctors[0].id,
+            start_at=slot.start_at,
+            reason=self._rng.choice(REASONS),
+        )
+        try:
+            return await self._appointments.book(
+                Actor(patient_id, UserRole.PATIENT, channel), request
+            )
+        except AppError:  # trùng giờ với lịch khác của chính bệnh nhân, đủ 3 lịch: bỏ qua
+            return None
+
+    async def _reschedule(self, patient_id: int, appointment: "AppointmentOut") -> None:
+        """Dời sang ngày khác của cùng bác sĩ, trong vài ngày sau lịch cũ."""
+        from app.modules.appointments.schemas import RescheduleRequest
+        from app.modules.scheduling.service import AvailabilityQuery
+
+        day = appointment.start_at.date() + timedelta(days=self._rng.randint(1, 5))
+        result = await self._scheduling.availability(
+            AvailabilityQuery(appointment.service.id, appointment.doctor.id, date_from=day)
+        )
+        slots = result.days[0].slots
+        if not slots:
+            return
+        request = RescheduleRequest(
+            start_at=self._rng.choice(slots).start_at, doctor_id=appointment.doctor.id
+        )
+        with contextlib.suppress(AppError):  # trùng lịch khác của chính bệnh nhân: giữ lịch cũ
+            await self._appointments.reschedule(
+                Actor(patient_id, UserRole.PATIENT, Channel.WEB), appointment.id, request
+            )
+
+    async def _cancel(self, patient_id: int, appointment_id: int) -> None:
+        from app.modules.appointments.schemas import CancelRequest
+
+        request = CancelRequest(reason=self._rng.choice(CANCEL_REASONS))
+        with contextlib.suppress(AppError):  # còn dưới 2 giờ: không hủy được trực tuyến
+            await self._appointments.cancel(
+                Actor(patient_id, UserRole.PATIENT, Channel.WEB), appointment_id, request
+            )
 
 
 async def _seed_doctors(

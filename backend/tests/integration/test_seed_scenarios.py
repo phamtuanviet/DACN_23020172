@@ -1,8 +1,9 @@
-"""Tiêu chí "Xong khi" của Sprint 2 và NFR-01, chạy trên đúng dữ liệu mẫu của seed (docs mục 7.5).
+"""Tiêu chí "Xong khi" của Sprint 2, 3 và NFR-01 trên đúng dữ liệu mẫu của seed (docs mục 7.5).
 
 - Gõ "da lieu" ra đúng các dịch vụ Da liễu (FR-CAT-04).
 - Hồ sơ bác sĩ hiện khung trống thật của 7 ngày tới (UC03, FR-SCH-01..03).
 - `/availability` p95 < 500 ms với dữ liệu seed (NFR-01).
+- Lịch mẫu có vòng đời thật: đã khám, vắng mặt, đã hủy, đã đổi giờ (Sprint 3).
 """
 
 import time as clock_time
@@ -10,12 +11,14 @@ from datetime import date, timedelta
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
-from app.db.enums import AppointmentStatus
-from app.db.models.appointments import Appointment
-from app.db.seed import seed_database
+from app.db.enums import AppointmentStatus, HistoryAction
+from app.db.models.appointments import Appointment, AppointmentHistory
+from app.db.seed import DEMO_PASSWORD, seed_database
+from tests.conftest import TEST_NOW
 from tests.integration.conftest import MutableClock
 
 pytestmark = pytest.mark.integration
@@ -103,3 +106,57 @@ async def test_availability_p95_is_under_500_ms_with_seed_data(
     durations.sort()
     p95 = durations[int(len(durations) * 0.95) - 1]
     assert p95 < 0.5, f"p95 = {p95 * 1000:.0f} ms"
+
+
+async def test_seeded_appointments_have_a_realistic_lifecycle(
+    seeded: None, app_client: AsyncClient, db: AsyncSession
+) -> None:
+    """Lịch mẫu đi qua chính service (Sprint 3): đủ trạng thái cuối, có lịch đổi giờ, lịch sử
+    có mốc thời gian hợp lý và không bác sĩ nào khám hai người cùng lúc."""
+    grouped = select(Appointment.status, func.count()).group_by(Appointment.status)
+    counts = {status: count for status, count in (await db.execute(grouped)).all()}
+    for status in ("BOOKED", "COMPLETED", "NO_SHOW", "CANCELLED"):
+        assert counts.get(AppointmentStatus(status), 0) > 0, status
+    assert AppointmentStatus.ARRIVED not in counts  # buổi khám đã qua đều có kết quả
+    stale = await db.execute(
+        select(func.count()).where(
+            Appointment.status == AppointmentStatus.BOOKED, Appointment.end_at <= TEST_NOW
+        )
+    )
+    assert stale.scalar_one() == 0
+    actions = set((await db.execute(select(AppointmentHistory.action))).scalars())
+    assert {HistoryAction.CREATE, HistoryAction.RESCHEDULE, HistoryAction.CANCEL} <= actions
+    assert HistoryAction.STATUS_CHANGE in actions
+    future_history = await db.execute(
+        select(func.count()).where(AppointmentHistory.created_at > TEST_NOW)
+    )
+    assert future_history.scalar_one() == 0  # mốc thời gian theo đồng hồ của seed
+
+    other = aliased(Appointment)
+    overlapping = await db.execute(
+        select(func.count())
+        .select_from(Appointment)
+        .join(
+            other,
+            (other.doctor_id == Appointment.doctor_id)
+            & (other.id > Appointment.id)
+            & (other.start_at < Appointment.end_at)
+            & (Appointment.start_at < other.end_at),
+        )
+        .where(
+            Appointment.status != AppointmentStatus.CANCELLED,
+            other.status != AppointmentStatus.CANCELLED,
+        )
+    )
+    assert overlapping.scalar_one() == 0
+    await db.commit()
+
+    login = await app_client.post(
+        "/api/v1/auth/login", json={"email": "lan@demo.local", "password": DEMO_PASSWORD}
+    )
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    upcoming = (await app_client.get("/api/v1/appointments/me", headers=headers)).json()
+    history = (
+        await app_client.get("/api/v1/appointments/me?scope=history", headers=headers)
+    ).json()
+    assert upcoming["total"] == 2 and history["total"] >= 2

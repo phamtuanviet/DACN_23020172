@@ -1,10 +1,10 @@
 # System Design — Hệ thống đặt lịch khám bệnh tích hợp AI Agent
 
-Oct 10, 2026 · @Viet · Phiên bản 1.4
+Oct 10, 2026 · @Viet · Phiên bản 1.5
 
 Tài liệu này mô tả thiết kế hệ thống ở mức đủ để bắt tay viết code và đưa lên chạy thật (production): kiến trúc backend/frontend, database, API, các module, luồng dữ liệu, hạ tầng triển khai và các quyết định công nghệ kèm lý do. Căn cứ là PRD 0.1, SRS 1.0 và ERD (cùng ngày 10/10/2026); các mã BR, FR, NFR, AC, UC giữ nguyên như trong ba tài liệu đó.
 
-Bản 1.1 thay mọi lựa chọn chỉ phù hợp demo cục bộ ở bản 1.0 bằng lựa chọn vận hành được ở production; bản 1.2 chuyển frontend sang Next.js; bản 1.3 đồng bộ với khung project đã dựng; bản 1.4 bổ sung chi tiết của Scheduling Engine và API danh mục khi hiện thực Sprint 2. Lịch sử thay đổi ở mục 14.3.
+Bản 1.1 thay mọi lựa chọn chỉ phù hợp demo cục bộ ở bản 1.0 bằng lựa chọn vận hành được ở production; bản 1.2 chuyển frontend sang Next.js; bản 1.3 đồng bộ với khung project đã dựng; bản 1.4 bổ sung chi tiết của Scheduling Engine và API danh mục khi hiện thực Sprint 2; bản 1.5 bổ sung xem, đổi, hủy lịch và đổi trạng thái khi hiện thực Sprint 3. Lịch sử thay đổi ở mục 14.3.
 
 ## 1. Mục tiêu thiết kế
 
@@ -671,8 +671,12 @@ Tổng cộng 18 bảng: 17 bảng của ERD và `refresh_tokens`.
 ### 7.5 Dữ liệu ban đầu
 
 - **Production không có dữ liệu giả.** `seed.py` từ chối chạy khi `APP_ENV=production`. Sau lần deploy đầu, chạy `python -m app.cli create-admin --email …` (mật khẩu nhập tương tác, không qua tham số dòng lệnh) để tạo quản trị đầu tiên. Danh mục ban đầu (chuyên khoa, dịch vụ, bác sĩ) nhập qua giao diện quản trị, hoặc bằng `python -m app.cli import-catalog catalog.yaml` để đỡ nhập tay; `scope_description` của dịch vụ cần viết kỹ vì Agent dựa vào đó để giải thích phạm vi khám (US-10).
-- **Dev và staging dùng seed.** Faker locale `vi_VN` với seed cố định nên kết quả lặp lại được; số lượng như SRS 6.3 (6 chuyên khoa, khoảng 20 dịch vụ, 20 bác sĩ, 50 bệnh nhân, 2 quản trị). Mọi mốc thời gian sinh tương đối so với ngày chạy seed: ca làm hiệu lực từ 2 tuần trước tới 6 tuần sau; khoảng 300 lịch hẹn gồm lịch 2 tuần trước (COMPLETED, NO_SHOW, CANCELLED) và lịch sắp tới (BOOKED).
-- Lịch hẹn mẫu được tạo qua chính `AppointmentService`, nên dữ liệu mẫu tuân theo mọi quy tắc và có sẵn lịch sử thay đổi. Hiện có lịch BOOKED trong 2 tuần tới, đặt bằng đồng hồ thật, khoảng 30% qua kênh AGENT; lịch đã qua (COMPLETED, NO_SHOW, CANCELLED) được thêm khi có API đổi trạng thái, bằng đồng hồ giả lùi về quá khứ. Lịch mẫu không kèm email xác nhận vì địa chỉ @demo.local không có thật. Database đã nạp seed trước đó thêm lịch mẫu bằng `python -m app.cli seed-appointments`.
+- **Dev và staging dùng seed.** Faker locale `vi_VN` với seed cố định nên kết quả lặp lại được; số lượng như SRS 6.3 (6 chuyên khoa, khoảng 20 dịch vụ, 20 bác sĩ, 50 bệnh nhân, 2 quản trị). Mọi mốc thời gian sinh tương đối so với ngày chạy seed: ca làm hiệu lực từ 2 tuần trước tới 6 tuần sau; lịch hẹn gồm lịch 2 tuần trước (COMPLETED, NO_SHOW, CANCELLED) và lịch sắp tới (BOOKED), chi tiết ở ý dưới.
+- Lịch hẹn mẫu được tạo qua chính `AppointmentService`, nên dữ liệu mẫu tuân theo mọi quy tắc và có sẵn lịch sử thay đổi. Hai phần:
+  - **2 tuần trước:** mô phỏng theo dòng thời gian bằng đồng hồ giả. Mỗi việc (đặt, đến khám, khám xong, vắng mặt, hủy) chạy đúng thứ tự với đồng hồ tua tới lúc đó, nên giới hạn 3 lịch, khung trống và hạn hủy 2 giờ được kiểm như thật; khoảng 70% Đã khám, 10% Vắng mặt, 20% bệnh nhân hủy trước.
+  - **2 tuần tới:** lịch BOOKED đặt bằng đồng hồ thật, khoảng 30% qua kênh AGENT; một phần được bệnh nhân đổi giờ hoặc hủy.
+  - Tổng khoảng 220 lịch hẹn (SRS 6.3 ước 300): khoảng 75 sắp tới, 100 đã khám, 35 đã hủy, 15 vắng mặt. Tài khoản demo `lan@demo.local` luôn có 2 lịch sắp tới và vài lịch đã qua.
+  - Lịch mẫu không kèm email vì địa chỉ @demo.local không có thật. Database đã nạp seed trước đó thêm lịch mẫu bằng `python -m app.cli seed-appointments`.
 - Tài khoản demo cố định (ví dụ `admin@demo.local`, `minh.tran@demo.local`, `lan@demo.local`) chỉ tồn tại ở dev và staging. Mật khẩu chung `Demo12345` chỉ dùng ở dev; ở staging (công khai trên Internet) lệnh seed hỏi mật khẩu khi chạy, vì giá trị nằm trong repo thì ai cũng đọc được.
 
 ### 7.6 Thời gian và múi giờ
@@ -1654,3 +1658,5 @@ Các điểm sau là quyết định ở mức thiết kế. SRS mục 2.2, 2.3 
 **Bản 1.3 (so với 1.2):** đồng bộ với khung project đã dựng trong repo. Cụ thể: cấu trúc thư mục thực tế (mục 4.1); tên file secret trùng tên trường cấu hình (`database_url`, `database_migrator_url`, thêm `smtp_user`); Next.js 16 dùng `src/proxy.ts` thay `middleware.ts`; `APP_ENV` nhận `development`, `staging`, `production`; file tĩnh bản cũ giữ 14 ngày; mục 11.2 và 11.3 chép nguyên `deploy/compose.prod.yaml` và `deploy/Caddyfile`.
 
 **Bản 1.4 (so với 1.3):** bổ sung khi hiện thực Sprint 2, không đổi schema. Thêm `GET /availability/earliest` và trường `status` của từng ngày trong `/availability` (mục 5.2, 8.2, 8.3); `ensure_slot_bookable` phân biệt `SLOT_TAKEN` với `SLOT_NOT_OFFERED` (mục 5.3); INSERT lịch hẹn chạy trong SAVEPOINT để thử bác sĩ kế tiếp và sinh lại mã (mục 5.4); seed có lịch hẹn mẫu đặt qua `AppointmentService` (mục 7.5).
+
+**Bản 1.5 (so với 1.4):** bổ sung khi hiện thực Sprint 3, không đổi schema. Thêm `GET /appointments/me` có phân trang, `GET /appointments/{id}` kèm lịch sử thay đổi, đổi lịch, hủy lịch, đổi trạng thái buổi khám (mục 8.2, 8.3); `AppointmentOut` thêm `change_until`. Đổi lịch khóa bác sĩ trước lịch hẹn và chấp nhận khung trên lưới mà `/availability` hiển thị (mục 5.3, 5.4); giới hạn thời điểm khi cập nhật buổi khám (mục 5.5); gắn cờ kiểm tra lại dưới khóa (mục 5.7); giới hạn 10 lần đặt, đổi, hủy mỗi phút cho mỗi người dùng (mục 4.6, 4.7); bác sĩ không thấy lý do hủy (mục 4.6); seed mô phỏng lịch 2 tuần trước theo dòng thời gian (mục 7.5); frontend thêm `shared/appointments`, trang `/booking/done` và query key của lịch hẹn (mục 9.2–9.4).
