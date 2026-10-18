@@ -31,7 +31,10 @@ test("đăng ký bệnh nhân mới rồi vào thẳng Lịch của tôi", async
   await expect(page.getByRole("heading", { name: "Lịch của tôi" })).toBeVisible();
 });
 
-test("email đã có tài khoản báo ngay tại ô email", async ({ page }) => {
+test("email đã có tài khoản báo ngay tại ô email", async ({ page }, testInfo) => {
+  // Kiểm tra phía server, không phụ thuộc bố cục: chỉ chạy một project để dành lượt đăng ký
+  // (5 lần/phút/IP) cho booking.spec.ts.
+  test.skip(testInfo.project.name !== "desktop", "chỉ chạy trên máy tính");
   await page.goto("/register");
   await page.getByLabel("Họ và tên").fill("Nguyễn Thị Lan");
   await page.getByLabel("Email").fill("LAN@demo.local");
