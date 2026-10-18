@@ -1,11 +1,9 @@
-import { PagePlaceholder } from "@/shared/ui/page-placeholder";
+import type { Metadata } from "next";
+
+import { ProfileScreen } from "@/features/auth";
+
+export const metadata: Metadata = { title: "Hồ sơ cá nhân" };
 
 export default function Page() {
-  return (
-    <PagePlaceholder
-      sprint={3}
-      title="Hồ sơ cá nhân"
-      description="Đổi mật khẩu, yêu cầu xóa tài khoản (FR-AUTH-06)."
-    />
-  );
+  return <ProfileScreen />;
 }

@@ -75,8 +75,39 @@ export const registerSchema = z.object({
   privacy_consent: z.literal(true, { error: E.consentRequired }),
 });
 
+/** "1994-03-12" (API) → "12/03/1994" (ô nhập ngày sinh). */
+export function birthDateInput(isoDate: string | null | undefined): string {
+  const match = isoDate ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate) : null;
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : "";
+}
+
+// Hồ sơ cá nhân (FR-AUTH-06): như đăng ký, trừ email và mật khẩu.
+export const profileSchema = registerSchema.pick({
+  full_name: true,
+  phone: true,
+  birth_date: true,
+  gender: true,
+});
+
+export const passwordChangeSchema = z
+  .object({
+    current_password: z.string().min(1, E.required).max(128),
+    new_password: z.string().max(128).refine(meetsPasswordPolicy, E.passwordWeak),
+    confirm_password: z.string(),
+  })
+  .refine((v) => v.confirm_password === v.new_password, {
+    path: ["confirm_password"],
+    message: TEXT.profile.passwordMismatch,
+  })
+  .refine((v) => !v.current_password || v.new_password !== v.current_password, {
+    path: ["new_password"],
+    message: TEXT.profile.passwordSameAsOld,
+  });
+
 export type LoginValues = z.infer<typeof loginSchema>;
 export type RegisterValues = z.input<typeof registerSchema>;
+export type ProfileValues = z.input<typeof profileSchema>;
+export type PasswordChangeValues = z.input<typeof passwordChangeSchema>;
 
 // Tên ô trong form khác tên trường API ở đúng một chỗ: ngày sinh.
 export const API_FIELD_TO_FORM: Record<string, keyof RegisterValues> = {

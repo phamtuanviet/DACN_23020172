@@ -950,7 +950,7 @@ Thư mục trong ngoặc như `(public)`, `(patient)` là route group: chỉ đ�
 | Khách | `/register` · `/login` | Đăng ký · Đăng nhập | Client |
 | Bệnh nhân | `/booking` · `/booking/done?id=` | Đặt lịch: dịch vụ → bác sĩ → ngày giờ → xác nhận; trang đặt thành công đọc lại lịch theo id nên tải lại vẫn đúng | Client |
 | Bệnh nhân | `/me/appointments?tab=&status=&id=` | Lịch của tôi: tab Sắp tới, Lịch sử, lọc trạng thái, chi tiết kèm lịch sử thay đổi; hộp thoại đổi, hủy | Client |
-| Bệnh nhân | `/me/profile` | Hồ sơ cá nhân, đổi mật khẩu, yêu cầu xóa tài khoản | Client |
+| Bệnh nhân | `/me/profile` | Hồ sơ cá nhân, đổi mật khẩu; yêu cầu xóa tài khoản làm cùng `DELETE /me` (mục 11.8) | Client |
 | Bệnh nhân | (nổi trên mọi trang) | Khung chat Agent có thẻ xác nhận | Client |
 | Bác sĩ | `/doctor/schedule` | Lịch khám theo ngày, tuần | Client |
 | Bác sĩ | `/doctor/appointments/[id]` | Chi tiết lịch hẹn: trạng thái, ghi chú | Client |

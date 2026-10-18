@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  birthDateInput,
   formatBirthDateInput,
   normalizePhone,
   parseBirthDate,
+  passwordChangeSchema,
   passwordStrength,
   registerSchema,
 } from "./validation";
@@ -78,5 +80,29 @@ describe("registerSchema", () => {
   it("báo lỗi khi chưa chọn giới tính", () => {
     const result = registerSchema.safeParse({ ...valid, gender: undefined });
     expect(result.error?.issues[0]?.message).toBe("Vui lòng chọn giới tính.");
+  });
+});
+
+describe("hồ sơ và đổi mật khẩu", () => {
+  it("ngày sinh từ API hiện lại theo dạng ngày/tháng/năm", () => {
+    expect(birthDateInput("1994-03-12")).toBe("12/03/1994");
+    expect(birthDateInput(null)).toBe("");
+  });
+
+  it("mật khẩu nhập lại phải khớp và mật khẩu mới phải khác mật khẩu cũ", () => {
+    const base = {
+      current_password: "Matkhau123",
+      new_password: "Moi12345",
+      confirm_password: "Moi12345",
+    };
+    expect(passwordChangeSchema.safeParse(base).success).toBe(true);
+    const mismatch = passwordChangeSchema.safeParse({ ...base, confirm_password: "Khac12345" });
+    expect(mismatch.error?.issues[0]?.path).toEqual(["confirm_password"]);
+    const same = passwordChangeSchema.safeParse({
+      ...base,
+      new_password: "Matkhau123",
+      confirm_password: "Matkhau123",
+    });
+    expect(same.error?.issues[0]?.path).toEqual(["new_password"]);
   });
 });
