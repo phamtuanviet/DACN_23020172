@@ -7,6 +7,8 @@ export type ApiError = {
     fields?: FieldIssue[];
     locked_until?: string;
     request_id?: string;
+    clinic_phone?: string | null;
+    alternatives?: { doctor_id: number; start_at: string; end_at: string }[];
   };
 };
 
@@ -25,8 +27,9 @@ const MESSAGES: Record<string, string> = {
   DOCTOR_SERVICE_MISMATCH: "Bác sĩ không thực hiện dịch vụ này hoặc đã ngừng nhận lịch.",
   SLOT_TAKEN: "Khung giờ vừa được người khác đặt, vui lòng chọn khung khác.",
   PATIENT_OVERLAP: "Bạn đã có một lịch hẹn khác trùng giờ này.",
-  CHANGE_DEADLINE_PASSED: "Đã quá thời hạn đổi/hủy trực tuyến, vui lòng gọi phòng khám.",
   MAX_ACTIVE_APPOINTMENTS: "Bạn đã có 3 lịch đang chờ khám.",
+  // Không dịch lại, dùng message của backend vì cụ thể hơn: SHIFT_OVERLAP (nêu ca bị chồng),
+  // CHANGE_DEADLINE_PASSED (kèm số điện thoại phòng khám), INVALID_TRANSITION (nêu trạng thái).
   AGENT_UNAVAILABLE: "Trợ lý tạm thời không hoạt động, bạn vẫn đặt lịch được trên trang Đặt lịch.",
   INTERNAL_ERROR: GENERIC_ERROR,
 };

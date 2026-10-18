@@ -25,9 +25,10 @@ export function parseBookingParams(params: ParamsLike): BookingState {
   };
 }
 
-/** 0 = chọn dịch vụ, 1 = chọn bác sĩ, 2 = chọn ngày giờ (Sprint 3), 3 = xác nhận. */
+/** 0 = chọn dịch vụ, 1 = chọn bác sĩ, 2 = chọn ngày giờ, 3 = xác nhận. */
 export function currentStep(state: BookingState): number {
   if (state.service === undefined) return 0;
   if (state.doctor === undefined) return 1;
-  return 2;
+  if (state.start === undefined) return 2;
+  return 3;
 }

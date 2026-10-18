@@ -16,7 +16,8 @@ src/
 ├── features/<tên>/      giao diện + logic của một tính năng; bên ngoài chỉ dùng qua index.ts
 ├── shared/
 │   ├── api/               client.ts (trình duyệt), server.ts (server component), schema.d.ts (sinh tự động)
-│   ├── auth/  availability/  config/  lib/  ui/
+│   ├── appointments/      hook lịch hẹn dùng chung booking và my-appointments
+│   ├── auth/  availability/  config/  lib/  layout/  ui/
 └── proxy.ts             Content-Security-Policy có nonce
 ```
 

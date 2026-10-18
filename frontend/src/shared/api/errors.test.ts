@@ -47,9 +47,18 @@ describe("errorMessage", () => {
     expect(errorMessage({ code, message: "x" })).toContain(text);
   });
 
-  it("giữ message chi tiết của backend cho SHIFT_OVERLAP (nêu ca bị chồng)", () => {
-    const message = "Ca này chồng lên ca 08:00–11:30 đã có (hiệu lực 01/10/2026 – không thời hạn).";
-    expect(errorMessage({ code: "SHIFT_OVERLAP", message })).toBe(message);
+  it.each([
+    [
+      "SHIFT_OVERLAP",
+      "Ca này chồng lên ca 08:00–11:30 đã có (hiệu lực 01/10/2026 – không thời hạn).",
+    ],
+    [
+      "CHANGE_DEADLINE_PASSED",
+      "Chỉ đổi, hủy trực tuyến trước giờ khám ít nhất 2 giờ. Vui lòng gọi phòng khám theo số 028 3822 0000 để được hỗ trợ.",
+    ],
+    ["INVALID_TRANSITION", "Lịch hẹn đã hủy nên không đổi, hủy được nữa."],
+  ])("giữ message chi tiết của backend cho %s", (code, message) => {
+    expect(errorMessage({ code, message })).toBe(message);
   });
 
   it("dùng message của backend khi chưa có bản dịch", () => {

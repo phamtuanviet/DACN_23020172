@@ -2,11 +2,12 @@
 
 // Khung trống luôn lấy mới từ trình duyệt, không cache ở server (TD-05, docs mục 9.4).
 // Cùng query key thì TanStack Query gộp thành một request, nên nhiều thẻ trên trang dùng chung.
+// Kèm danh sách bác sĩ của một dịch vụ: wizard đặt lịch và hộp thoại đổi lịch cùng dùng.
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/shared/api/client";
 import { toApiError } from "@/shared/api/errors";
-import type { Availability, EarliestItem } from "@/shared/api/types";
+import type { Availability, Doctor, EarliestItem } from "@/shared/api/types";
 
 export type AvailabilityParams = {
   serviceId: number;
@@ -51,6 +52,23 @@ export function useEarliest(serviceIds: number[], { byDoctor = false } = {}) {
       });
       if (!data) throw toApiError(error);
       return data.items;
+    },
+  });
+}
+
+const CATALOG_STALE_MS = 5 * 60 * 1000; // danh mục ít đổi, như cache của trang công khai
+
+export function useDoctorsOfService(serviceId: number | undefined) {
+  return useQuery({
+    queryKey: ["catalog", "doctors", { serviceId }],
+    staleTime: CATALOG_STALE_MS,
+    enabled: serviceId !== undefined,
+    queryFn: async (): Promise<Doctor[]> => {
+      const { data, error } = await api.GET("/api/v1/doctors", {
+        params: { query: { service_id: serviceId } },
+      });
+      if (!data) throw toApiError(error);
+      return data;
     },
   });
 }

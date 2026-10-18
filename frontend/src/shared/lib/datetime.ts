@@ -84,3 +84,55 @@ export function formatSlot(value: string): string {
 export function formatSlotLong(value: string): string {
   return `${formatDayLong(clinicDay(value))}, ${formatTime(value)}`;
 }
+
+/** "08:00–08:20" */
+export function formatTimeRange(start: string, end: string): string {
+  return `${formatTime(start)}–${formatTime(end)}`;
+}
+
+/** "12/10/2026 20:05" — mốc thời gian trong lịch sử thay đổi. */
+export function formatStamp(value: string): string {
+  return formatInTimeZone(value, CLINIC_TZ, "dd/MM/yyyy HH:mm");
+}
+
+/** Ô ngày trên thẻ lịch hẹn: { weekday: "T7", day: "17", month: "Th10" }. */
+export function dayBadge(value: string): { weekday: string; day: string; month: string } {
+  const date = parseDay(clinicDay(value));
+  return {
+    weekday: WEEKDAY_SHORT[date.getUTCDay()] ?? "",
+    day: String(date.getUTCDate()),
+    month: `Th${date.getUTCMonth() + 1}`,
+  };
+}
+
+/** Tháng "YYYY-MM" của một ngày "YYYY-MM-DD". */
+export function monthOf(day: string): string {
+  return day.slice(0, 7);
+}
+
+/** "2026-10" + 1 → "2026-11". */
+export function addMonths(month: string, months: number): string {
+  const [year, monthNumber] = month.split("-").map(Number) as [number, number];
+  const date = new Date(Date.UTC(year, monthNumber - 1 + months, 1));
+  return date.toISOString().slice(0, 7);
+}
+
+/** "Tháng 10/2026" */
+export function formatMonth(month: string): string {
+  const [year, monthNumber] = month.split("-").map(Number) as [number, number];
+  return `Tháng ${monthNumber}/${year}`;
+}
+
+/** Các ngày của tháng, kèm số ô trống đầu tuần để lưới lịch bắt đầu từ Thứ Hai. */
+export function monthGrid(month: string): { leading: number; days: string[] } {
+  const first = parseDay(`${month}-01`);
+  const leading = (first.getUTCDay() + 6) % 7; // Thứ Hai = 0
+  const days: string[] = [];
+  for (let day = `${month}-01`; monthOf(day) === month; day = addDays(day, 1)) days.push(day);
+  return { leading, days };
+}
+
+/** Số ngày từ `from` tới `to` (cùng dạng "YYYY-MM-DD"). */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((parseDay(to).getTime() - parseDay(from).getTime()) / 86_400_000);
+}

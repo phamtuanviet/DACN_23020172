@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { formatPrice, initials, splitScope, unaccent } from "./format";
+import { formatPhone, formatPrice, initials, splitScope, unaccent } from "./format";
 
 describe("format", () => {
+  it("số điện thoại tách nhóm 4-3-3", () => {
+    expect(formatPhone("0912345678")).toBe("0912 345 678");
+    expect(formatPhone(null)).toBe("");
+    expect(formatPhone("+8491234")).toBe("+8491234");
+  });
+
   it("giá theo kiểu Việt Nam", () => {
     expect(formatPrice(250_000)).toBe("250.000 ₫");
     expect(formatPrice(0)).toBe("0 ₫");

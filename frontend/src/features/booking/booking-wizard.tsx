@@ -4,16 +4,19 @@
 // (docs mục 9.3), nên nút Quay lại của trình duyệt và liên kết từ trang công khai luôn đúng bước.
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 
 import { bookingHref } from "@/shared/availability/booking-href";
+import { formatSlotLong } from "@/shared/lib/datetime";
 import { TEXT } from "@/shared/texts";
 import { Alert } from "@/shared/ui/alert";
 import { buttonClass } from "@/shared/ui/button";
 import { Stepper } from "@/shared/ui/stepper";
 
+import { ConfirmStep } from "./confirm-step";
+import { DateTimeStep } from "./datetime-step";
 import { DoctorStep } from "./doctor-step";
 import { currentStep, parseBookingParams } from "./params";
-import { PendingStep } from "./pending-step";
 import { useDoctorsOfService, useServices } from "./queries";
 import { ServiceStep } from "./service-step";
 
@@ -21,6 +24,9 @@ export function BookingWizard() {
   const searchParams = useSearchParams();
   const state = parseBookingParams(searchParams);
   const step = currentStep(state);
+  // Lý do khám chỉ nằm trong bộ nhớ (dữ liệu sức khỏe): wizard không remount khi đổi bước vì
+  // chỉ query trên URL thay đổi, nên giá trị còn nguyên giữa bước 3 và bước 4.
+  const [reason, setReason] = useState("");
   const services = useServices({}, step > 0);
   const service = services.data?.find((s) => s.id === state.service);
   const doctors = useDoctorsOfService(
@@ -49,8 +55,28 @@ export function BookingWizard() {
     );
   } else if (step === 1) {
     content = <DoctorStep key={service.id} service={service} />;
+  } else if (step === 2) {
+    content = (
+      <DateTimeStep
+        key={`${service.id}-${state.doctor}`}
+        service={service}
+        state={state}
+        doctorName={doctorName}
+        reason={reason}
+        onReasonChange={setReason}
+      />
+    );
   } else {
-    content = <PendingStep service={service} state={state} />;
+    content = (
+      <ConfirmStep
+        service={service}
+        state={state}
+        startAt={state.start ?? ""}
+        doctorName={doctorName}
+        reason={reason}
+        onBooked={() => setReason("")}
+      />
+    );
   }
 
   return (
@@ -59,7 +85,7 @@ export function BookingWizard() {
         label="Các bước đặt lịch"
         steps={[...TEXT.booking.steps]}
         current={step}
-        details={[service?.name, doctorName]}
+        details={[service?.name, doctorName, state.start ? formatSlotLong(state.start) : undefined]}
       />
       {content}
     </main>

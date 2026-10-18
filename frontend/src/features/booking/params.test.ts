@@ -35,5 +35,11 @@ describe("currentStep", () => {
     expect(currentStep(parse("specialty=2"))).toBe(0);
     expect(currentStep(parse("service=5"))).toBe(1);
     expect(currentStep(parse("service=5&doctor=any"))).toBe(2);
+    expect(currentStep(parse("service=5&doctor=7&date=2026-10-17"))).toBe(2);
+    expect(currentStep(parse("service=5&doctor=7&start=2026-10-17T08:00:00%2B07:00"))).toBe(3);
+  });
+
+  it("giờ sai dạng thì quay về bước chọn ngày giờ", () => {
+    expect(currentStep(parse("service=5&doctor=7&start=hom-nay"))).toBe(2);
   });
 });

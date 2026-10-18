@@ -1,17 +1,28 @@
-// Khung "Lịch hẹn của bạn" bên cạnh các bước (P-book-2): dịch vụ, bác sĩ, thời gian, giá.
+// Khung "Lịch hẹn của bạn" bên cạnh các bước (P-book-2, P-book-3): dịch vụ, bác sĩ, thời gian, giá.
 import type { Service } from "@/shared/api/types";
-import { formatDateTime } from "@/shared/lib/datetime";
+import { clinicDay, formatDayFull, formatTime } from "@/shared/lib/datetime";
 import { formatDuration, formatPrice } from "@/shared/lib/format";
 import { TEXT } from "@/shared/texts";
+import { InfoIcon } from "@/shared/ui/icons";
+
+function timeText(service: Service | undefined, startAt: string | undefined): string {
+  if (!startAt) return TEXT.booking.notChosen;
+  const day = formatDayFull(clinicDay(startAt));
+  if (!service) return `${day} · ${formatTime(startAt)}`;
+  const end = new Date(Date.parse(startAt) + service.duration_min * 60_000).toISOString();
+  return `${day} · ${formatTime(startAt)}–${formatTime(end)}`;
+}
 
 export function BookingSummary({
   service,
   doctorName,
   startAt,
+  note,
 }: {
   service?: Service;
   doctorName?: string;
   startAt?: string;
+  note?: string;
 }) {
   const rows: [string, string][] = [
     [
@@ -21,7 +32,7 @@ export function BookingSummary({
         : TEXT.booking.notChosen,
     ],
     [TEXT.booking.summaryDoctor, doctorName ?? TEXT.booking.notChosen],
-    [TEXT.booking.summaryTime, startAt ? formatDateTime(startAt) : TEXT.booking.notChosen],
+    [TEXT.booking.summaryTime, timeText(service, startAt)],
     [
       TEXT.booking.summaryPrice,
       service
@@ -45,6 +56,12 @@ export function BookingSummary({
           </div>
         ))}
       </dl>
+      {note ? (
+        <p className="flex gap-2 rounded-[10px] bg-primary-soft px-3 py-2.5 text-sm leading-5 text-primary-ink">
+          <InfoIcon size={18} className="mt-px shrink-0" />
+          {note}
+        </p>
+      ) : null}
     </aside>
   );
 }

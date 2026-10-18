@@ -2,13 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import {
   addDays,
+  addMonths,
   clinicDay,
+  dayBadge,
+  daysBetween,
   formatDateTime,
   formatDayFull,
   formatDayLong,
   formatDayShort,
+  formatMonth,
   formatSlot,
+  formatStamp,
+  formatTimeRange,
   isValidDay,
+  monthGrid,
   weekdayName,
 } from "./datetime";
 
@@ -38,5 +45,29 @@ describe("ngày địa phương", () => {
     expect(isValidDay("2026-02-30")).toBe(false);
     expect(isValidDay("abc")).toBe(false);
     expect(isValidDay("2026-10-17")).toBe(true);
+  });
+});
+
+describe("lịch tháng và thẻ lịch hẹn", () => {
+  it("lưới tháng bắt đầu từ Thứ Hai", () => {
+    const { leading, days } = monthGrid("2026-10"); // 01/10/2026 là Thứ Năm
+    expect(leading).toBe(3);
+    expect(days).toHaveLength(31);
+    expect(days.at(-1)).toBe("2026-10-31");
+    expect(monthGrid("2026-02").days).toHaveLength(28);
+  });
+
+  it("chuyển tháng qua năm và đếm ngày", () => {
+    expect(addMonths("2026-12", 1)).toBe("2027-01");
+    expect(addMonths("2026-01", -1)).toBe("2025-12");
+    expect(formatMonth("2026-10")).toBe("Tháng 10/2026");
+    expect(daysBetween("2026-10-30", "2026-11-02")).toBe(3);
+  });
+
+  it("thẻ lịch hẹn theo giờ Việt Nam", () => {
+    // 17:30 UTC ngày 16/10 là 00:30 ngày 17/10 ở Việt Nam
+    expect(dayBadge("2026-10-16T17:30:00Z")).toEqual({ weekday: "T7", day: "17", month: "Th10" });
+    expect(formatTimeRange("2026-10-17T01:00:00Z", "2026-10-17T01:20:00Z")).toBe("08:00–08:20");
+    expect(formatStamp("2026-10-12T13:05:00Z")).toBe("12/10/2026 20:05");
   });
 });

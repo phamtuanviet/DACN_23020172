@@ -11,6 +11,14 @@ export function formatDuration(minutes: number): string {
   return `${minutes} phút`;
 }
 
+/** "0912345678" → "0912 345 678"; số không đủ 10 chữ số giữ nguyên. */
+export function formatPhone(phone: string | null | undefined): string {
+  if (!phone) return "";
+  return /^\d{10}$/.test(phone)
+    ? `${phone.slice(0, 4)} ${phone.slice(4, 7)} ${phone.slice(7)}`
+    : phone;
+}
+
 /** Bỏ dấu tiếng Việt, chữ thường: "Đa Liễu" → "da lieu" (so khớp tên chuyên khoa, tìm nhanh). */
 export function unaccent(value: string): string {
   return value

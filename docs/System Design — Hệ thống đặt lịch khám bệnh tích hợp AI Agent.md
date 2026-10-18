@@ -927,7 +927,8 @@ frontend/
 │   │   ├── api/              # schema.d.ts (sinh từ OpenAPI) · server.ts (gọi API công khai từ server)
 │   │   │                     # · client.ts (trình duyệt: gắn token, tự refresh) · errors.ts (code → thông báo)
 │   │   ├── auth/             # authStore (Zustand) · RoleGuard
-│   │   ├── availability/     # useAvailability, useEarliest, liên kết vào wizard — dùng chung catalog và booking
+│   │   ├── availability/     # useAvailability, useEarliest, bộ chọn khung giờ, liên kết vào wizard — dùng chung catalog, booking, my-appointments
+│   │   ├── appointments/     # hook đặt, xem, đổi, hủy lịch; mô tả lịch sử thay đổi; file .ics — dùng chung booking và my-appointments
 │   │   ├── ui/               # component shadcn/ui
 │   │   └── lib/              # datetime.ts (Asia/Ho_Chi_Minh) · format.ts
 │   └── features/             # auth · catalog · booking · my-appointments · agent-chat · doctor · admin
@@ -947,7 +948,7 @@ Thư mục trong ngoặc như `(public)`, `(patient)` là route group: chỉ đ�
 | Khách | `/services` | Danh sách chuyên khoa, dịch vụ | Server |
 | Khách | `/doctors/[id]` | Hồ sơ bác sĩ, khung trống sắp tới | Server + client (phần khung trống) |
 | Khách | `/register` · `/login` | Đăng ký · Đăng nhập | Client |
-| Bệnh nhân | `/booking` | Đặt lịch: dịch vụ → bác sĩ → ngày → giờ → xác nhận | Client |
+| Bệnh nhân | `/booking` · `/booking/done?id=` | Đặt lịch: dịch vụ → bác sĩ → ngày giờ → xác nhận; trang đặt thành công đọc lại lịch theo id nên tải lại vẫn đúng | Client |
 | Bệnh nhân | `/me/appointments` | Lịch của tôi: tab Sắp tới, Lịch sử; hộp thoại đổi, hủy | Client |
 | Bệnh nhân | `/me/profile` | Hồ sơ cá nhân, đổi mật khẩu, yêu cầu xóa tài khoản | Client |
 | Bệnh nhân | (nổi trên mọi trang) | Khung chat Agent có thẻ xác nhận | Client |
@@ -959,7 +960,7 @@ Thư mục trong ngoặc như `(public)`, `(patient)` là route group: chỉ đ�
 | Quản trị | `/admin/appointments` | Lịch hẹn + hàng chờ (lịch cần xử lý, yêu cầu chuyển nhân viên) | Client |
 | Quản trị | `/admin/dashboard` | Dashboard thống kê (P2) | Client |
 
-- Trạng thái wizard nằm trên URL (`/booking?service=3&doctor=7&date=2026-10-17`), nên nút Back của trình duyệt hoạt động đúng và trang hồ sơ bác sĩ dẫn thẳng vào wizard với bác sĩ đã chọn sẵn.
+- Trạng thái wizard nằm trên URL (`/booking?service=3&doctor=7&date=2026-10-17`), nên nút Back của trình duyệt hoạt động đúng và trang hồ sơ bác sĩ dẫn thẳng vào wizard với bác sĩ đã chọn sẵn. Có `start=` là đang ở bước xác nhận. Riêng lý do khám là dữ liệu sức khỏe nên chỉ nằm trong bộ nhớ của wizard, không lên URL hay storage.
 - `RoleGuard` là client component đặt trong `layout.tsx` của `(patient)`, `doctor`, `admin`: nếu chưa có access token thì gọi `/auth/refresh`; thất bại thì chuyển về `/login?next=…`; sai vai trò thì hiện trang 403. Trong lúc chờ, layout hiện khung xương (skeleton) để không lộ giao diện. Không chặn ở `proxy.ts` vì nó chạy trên server, không thấy access token trong bộ nhớ trình duyệt, còn cookie refresh chỉ gửi tới `/api/v1/auth`.
 
 ### 9.4 State và gọi API
@@ -967,7 +968,7 @@ Thư mục trong ngoặc như `(public)`, `(patient)` là route group: chỉ đ�
 | Query key (TanStack Query) | Dữ liệu | Làm mới khi |
 | --- | --- | --- |
 | `['availability', params]` | Khung trống | `staleTime` 0; sau đặt/đổi/hủy; khi nhận `SLOT_TAKEN` |
-| `['appointments', 'me', scope]` | Lịch của tôi | Sau đặt/đổi/hủy trên web, sau khi xác nhận đề xuất trong chat |
+| `['appointments', 'me', {scope, status}]` (tải thêm từng trang), `['appointments', 'detail', id]` | Lịch của tôi, chi tiết lịch | Sau đặt/đổi/hủy trên web, sau khi xác nhận đề xuất trong chat |
 | `['doctor', 'schedule', range]` | Lịch khám của bác sĩ | Tự tải lại mỗi 60 giây và khi quay lại tab |
 | `['admin', 'appointments', filters]`, `['admin', 'queue']` | Lịch hẹn, hàng chờ | Tự tải lại mỗi 60 giây; sau mỗi thao tác |
 | `['admin', 'catalog', …]` | Danh mục trong trang quản trị | Sau mỗi thao tác CRUD; trang công khai tự cập nhật sau tối đa 5 phút |
