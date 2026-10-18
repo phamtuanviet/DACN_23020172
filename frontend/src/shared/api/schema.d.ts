@@ -388,13 +388,121 @@ export interface paths {
          * @description Đặt lịch cho chính mình (UC05, FR-APT-01). `doctor_id` rỗng: bác sĩ bất kỳ.
          *
          *     Lỗi: BOOKING_WINDOW, SLOT_NOT_OFFERED, DOCTOR_SERVICE_MISMATCH (400); SLOT_TAKEN kèm
-         *     `details.alternatives`, PATIENT_OVERLAP, MAX_ACTIVE_APPOINTMENTS (409).
+         *     `details.alternatives`, PATIENT_OVERLAP, MAX_ACTIVE_APPOINTMENTS (409); RATE_LIMITED (429)
+         *     khi đặt, đổi, hủy quá 10 lần/phút.
          */
         post: operations["book_appointment_api_v1_appointments_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/appointments/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Appointments
+         * @description Lịch sắp tới (gần nhất trước) và lịch sử (mới nhất trước), lọc theo trạng thái (UC08).
+         */
+        get: operations["my_appointments_api_v1_appointments_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/appointments/{appointment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Appointment
+         * @description Chi tiết, ghi chú bác sĩ, lịch sử thay đổi. Chủ lịch, bác sĩ của lịch, quản trị; người khác
+         *     nhận 403 (AC-05).
+         */
+        get: operations["get_appointment_api_v1_appointments__appointment_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/appointments/{appointment_id}/reschedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Reschedule Appointment
+         * @description Đổi lịch, giữ nguyên mã và dịch vụ (UC06, FR-APT-02, FR-ADM-03).
+         *
+         *     Lỗi: như đặt lịch; thêm CHANGE_DEADLINE_PASSED kèm `details.clinic_phone` khi bệnh nhân còn
+         *     dưới 2 giờ, INVALID_TRANSITION khi lịch không còn ở trạng thái Đã đặt (409). Thất bại thì lịch
+         *     cũ giữ nguyên (AC-04).
+         */
+        patch: operations["reschedule_appointment_api_v1_appointments__appointment_id__reschedule_patch"];
+        trace?: never;
+    };
+    "/api/v1/appointments/{appointment_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Appointment
+         * @description Hủy lịch kèm lý do tùy chọn (UC07, FR-APT-03). Lỗi: CHANGE_DEADLINE_PASSED,
+         *     INVALID_TRANSITION (409).
+         */
+        post: operations["cancel_appointment_api_v1_appointments__appointment_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/appointments/{appointment_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change Appointment Status
+         * @description Đã đến, Đã khám, Vắng mặt theo sơ đồ trạng thái (FR-APT-06, FR-DOC-02). Bác sĩ chỉ cập
+         *     nhật lịch của mình trong ngày; chuyển sai sơ đồ trả 409 INVALID_TRANSITION.
+         */
+        patch: operations["change_appointment_status_api_v1_appointments__appointment_id__status_patch"];
         trace?: never;
     };
     "/api/v1/admin/doctors/{doctor_id}/shifts": {
@@ -511,6 +619,59 @@ export interface components {
             /** Needs Attention */
             needs_attention: boolean;
         };
+        /** AppointmentDetail */
+        AppointmentDetail: {
+            /** Id */
+            id: number;
+            /**
+             * Code
+             * @description Mã lịch hẹn LH-YYMMDD-XXXX
+             */
+            code: string;
+            status: components["schemas"]["AppointmentStatus"];
+            channel: components["schemas"]["Channel"];
+            service: components["schemas"]["ServiceRef"];
+            doctor: components["schemas"]["DoctorRef"];
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /**
+             * End At
+             * Format: date-time
+             */
+            end_at: string;
+            /**
+             * Can Change
+             * @description Người gọi còn đổi, hủy được không (BR-08)
+             */
+            can_change: boolean;
+            /**
+             * Change Until
+             * @description Hạn đổi, hủy trực tuyến của bệnh nhân (giờ khám − 2 giờ); rỗng khi không còn là lịch Đã đặt
+             */
+            change_until: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Cancel Reason */
+            cancel_reason: string | null;
+            /** Doctor Note */
+            doctor_note: string | null;
+            /**
+             * Needs Attention
+             * @description Bác sĩ nghỉ hoặc đổi ca: phòng khám sẽ liên hệ
+             */
+            needs_attention: boolean;
+            patient: components["schemas"]["PatientBrief"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** History */
+            history: components["schemas"]["HistoryEntry"][];
+        };
         /** AppointmentOut */
         AppointmentOut: {
             /** Id */
@@ -536,9 +697,25 @@ export interface components {
             end_at: string;
             /**
              * Can Change
-             * @description Bệnh nhân còn đổi, hủy được không (BR-08)
+             * @description Người gọi còn đổi, hủy được không (BR-08)
              */
             can_change: boolean;
+            /**
+             * Change Until
+             * @description Hạn đổi, hủy trực tuyến của bệnh nhân (giờ khám − 2 giờ); rỗng khi không còn là lịch Đã đặt
+             */
+            change_until: string | null;
+        };
+        /** AppointmentPage */
+        AppointmentPage: {
+            /** Items */
+            items: components["schemas"]["AppointmentOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
         };
         /**
          * AppointmentStatus
@@ -574,6 +751,14 @@ export interface components {
             /**
              * Reason
              * @description Lý do khám, tùy chọn, tối đa 500 ký tự
+             */
+            reason?: string | null;
+        };
+        /** CancelRequest */
+        CancelRequest: {
+            /**
+             * Reason
+             * @description Lý do hủy, tùy chọn, tối đa 500 ký tự
              */
             reason?: string | null;
         };
@@ -682,6 +867,44 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * HistoryAction
+         * @enum {string}
+         */
+        HistoryAction: "CREATE" | "RESCHEDULE" | "CANCEL" | "STATUS_CHANGE" | "NOTE_UPDATE" | "FLAG";
+        /**
+         * HistoryEntry
+         * @description Một dòng lịch sử thay đổi: ai, khi nào, kênh nào, cũ → mới (FR-APT-05).
+         */
+        HistoryEntry: {
+            action: components["schemas"]["HistoryAction"];
+            channel: components["schemas"]["Channel"];
+            /** @description Rỗng: tác vụ hệ thống */
+            actor_role: components["schemas"]["UserRole"] | null;
+            /**
+             * By Me
+             * @description Người đang xem chính là người thao tác
+             */
+            by_me: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            old: components["schemas"]["HistoryState"] | null;
+            new: components["schemas"]["HistoryState"] | null;
+        };
+        /** HistoryState */
+        HistoryState: {
+            status?: components["schemas"]["AppointmentStatus"] | null;
+            doctor?: components["schemas"]["DoctorRef"] | null;
+            /** Start At */
+            start_at?: string | null;
+            /** End At */
+            end_at?: string | null;
+            /** Needs Attention */
+            needs_attention?: boolean | null;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Email */
@@ -708,6 +931,21 @@ export interface components {
             /** @description Chỉ bệnh nhân có */
             gender?: components["schemas"]["Gender"] | null;
         };
+        /**
+         * PatientBrief
+         * @description Bác sĩ chỉ thấy họ tên và tuổi, không thấy email, số điện thoại (docs mục 4.6).
+         */
+        PatientBrief: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /**
+             * Age
+             * @description Tuổi tính từ ngày sinh
+             */
+            age: number | null;
+        };
         /** RegisterRequest */
         RegisterRequest: {
             /** Full Name */
@@ -730,6 +968,32 @@ export interface components {
              */
             privacy_consent: boolean;
         };
+        /**
+         * RescheduleRequest
+         * @description Đổi lịch giữ nguyên dịch vụ và mã lịch (UC06).
+         *
+         *     `doctor_id` bắt buộc, kể cả khi giữ bác sĩ cũ: khung giờ người dùng chọn thuộc lưới của đúng
+         *     bác sĩ đó, và service khóa bác sĩ này trước khi khóa lịch hẹn (docs mục 5.4).
+         */
+        RescheduleRequest: {
+            /**
+             * Start At
+             * Format: date-time
+             * @description Giờ bắt đầu của một khung do /availability trả về
+             */
+            start_at: string;
+            /**
+             * Doctor Id
+             * @description Bác sĩ hiện tại hoặc một bác sĩ khác cùng dịch vụ
+             */
+            doctor_id: number;
+        };
+        /**
+         * Scope
+         * @description Sắp tới: lịch Đã đặt, Đã đến chưa kết thúc. Lịch sử: mọi lịch còn lại (FR-APT-04).
+         * @enum {string}
+         */
+        Scope: "upcoming" | "history";
         /** ServiceAdminOut */
         ServiceAdminOut: {
             /** Id */
@@ -1005,6 +1269,17 @@ export interface components {
             description?: string | null;
             /** Is Active */
             is_active?: boolean | null;
+        };
+        /**
+         * StatusChangeRequest
+         * @description Hủy lịch đi qua `/cancel` để có lý do và email; endpoint này chỉ dành cho buổi khám.
+         */
+        StatusChangeRequest: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ARRIVED" | "COMPLETED" | "NO_SHOW";
         };
         /** TimeOffChangeOut */
         TimeOffChangeOut: {
@@ -1775,6 +2050,177 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_appointments_api_v1_appointments_me_get: {
+        parameters: {
+            query?: {
+                /** @description upcoming: sắp tới; history: lịch sử */
+                scope?: components["schemas"]["Scope"];
+                status?: components["schemas"]["AppointmentStatus"] | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_appointment_api_v1_appointments__appointment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                appointment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reschedule_appointment_api_v1_appointments__appointment_id__reschedule_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                appointment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RescheduleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_appointment_api_v1_appointments__appointment_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                appointment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_appointment_status_api_v1_appointments__appointment_id__status_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                appointment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

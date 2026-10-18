@@ -151,11 +151,13 @@ async def test_shared_schedule_helpers_check_the_actor(
     app_client: AsyncClient, db: AsyncSession, clinic: Clinic
 ) -> None:
     """Tool của Agent gọi thẳng service: bệnh nhân không được gắn cờ hay xem lịch theo bác sĩ."""
-    appointment_id = await add_appointment(db, clinic, start=time(9, 0), patient_index=1)
+    await add_appointment(db, clinic, start=time(9, 0), patient_index=1)
     patient = Actor(clinic.patient_ids[0], UserRole.PATIENT, Channel.AGENT)
     async with db.begin():
         with pytest.raises(AppError) as flag_error:
-            await flag_for_attention(db, patient, [appointment_id], source={"source": "TEST"})
+            await flag_for_attention(
+                db, patient, clinic.doctor_ids[0], [], source={"source": "TEST"}
+            )
         with pytest.raises(AppError) as read_error:
             await booked_for_doctor(
                 db, patient, clinic.doctor_ids[0], start=local_datetime(MONDAY, time(0))

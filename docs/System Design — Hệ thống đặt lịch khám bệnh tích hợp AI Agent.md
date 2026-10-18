@@ -275,7 +275,7 @@ Mũi tên nghĩa là "gọi hàm của". Quy tắc: không có vòng phụ thu�
 - Thu hồi: đăng xuất thu hồi token hiện tại; đổi mật khẩu, yêu cầu xóa tài khoản và quản trị khóa tài khoản thu hồi mọi token của người dùng đó.
 - Mỗi request, `current_user` giải mã access token rồi đọc dòng `users` theo khóa chính (một truy vấn khoảng 1 ms) để kiểm tra `is_active`; tài khoản bị khóa mất quyền ngay, không đợi token hết hạn.
 - Đăng nhập sai tăng `failed_login_count`; lần sai thứ 5 đặt `locked_until = now + 15 phút` và trả ngay `429 ACCOUNT_LOCKED` kèm `details.locked_until` (FR-AUTH-03); đăng nhập đúng đặt lại bộ đếm. Thông báo lỗi không phân biệt "sai email" với "sai mật khẩu"; email không tồn tại vẫn băm thử một lần để thời gian phản hồi như nhau. Nhập sai mật khẩu hiện tại khi đổi mật khẩu cũng tính vào bộ đếm này, để access token bị lộ không dùng được vào việc đoán mật khẩu.
-- Giới hạn tốc độ theo IP: đăng nhập 10 lần/phút, đăng ký 5 lần/phút, refresh 60 lần/phút, đổi mật khẩu 5 lần/phút.
+- Giới hạn tốc độ theo IP: đăng nhập 10 lần/phút, đăng ký 5 lần/phút, refresh 60 lần/phút, đổi mật khẩu 5 lần/phút. Theo người dùng: đặt, đổi, hủy lịch 10 lần/phút (mỗi lần sinh một email, nên chặn spam email vào hộp thư người khác và dò id lịch hẹn).
 - Đánh đổi đã chấp nhận: lỗi `ACCOUNT_LOCKED` cho biết email có tài khoản. Điều này không lộ thêm gì vì đăng ký vốn trả `EMAIL_TAKEN` (mục 7.1); giới hạn theo IP làm việc dò email chậm lại. Muốn kín hơn thì đổi cả hai sang thông báo chung kèm email cho chủ tài khoản.
 
 **Phân quyền hai lớp.** Lớp 1 ở router: `require_roles(...)` chặn sai vai trò, trả 403. Lớp 2 ở service (`appointments/policy.py`): kiểm tra quyền trên từng bản ghi theo BR-05, trả 403 (AC-05). Lớp 2 là bắt buộc vì tool của Agent gọi thẳng service, không đi qua router.
@@ -288,7 +288,7 @@ Mũi tên nghĩa là "gọi hàm của". Quy tắc: không có vòng phụ thu�
 | Đổi trạng thái | — | Lịch của mình trong ngày: BOOKED → ARRIVED, ARRIVED → COMPLETED, BOOKED → NO_SHOW | Mọi chuyển hợp lệ |
 | Ghi chú sau khám | Xem ghi chú lịch của mình | Ghi cho lịch của mình | Xem |
 | Đánh giá (P2) | Lịch của mình đã COMPLETED, một lần | — | Xem |
-| Thông tin bệnh nhân hiển thị | — | Họ tên, tuổi (tính từ ngày sinh), dịch vụ, giờ, lý do khám; không thấy email, số điện thoại | Đầy đủ |
+| Thông tin bệnh nhân hiển thị | — | Họ tên, tuổi (tính từ ngày sinh), dịch vụ, giờ, lý do khám; không thấy email, số điện thoại, ngày sinh, lý do hủy | Đầy đủ |
 
 Tài khoản quản trị có quyền trên mọi dữ liệu bệnh nhân, nên trước khi go-live nên bật xác thực hai lớp (TOTP) cho vai trò ADMIN (mục 11.8).
 
@@ -316,11 +316,11 @@ Mọi lỗi trả cùng một dạng, đúng SRS 7.2:
 | 409 | `PATIENT_OVERLAP` | Vi phạm `excl_patient_overlap` (BR-09) |
 | 409 | `MAX_ACTIVE_APPOINTMENTS` | Đã có 3 lịch BOOKED sắp tới (BR-09) |
 | 409 | `CHANGE_DEADLINE_PASSED` | Còn dưới 2 giờ trước giờ khám; `details.clinic_phone` để liên hệ (BR-08) |
-| 409 | `INVALID_TRANSITION` | Chuyển trạng thái không có trong sơ đồ (FR-APT-06) |
+| 409 | `INVALID_TRANSITION` | Chuyển trạng thái không có trong sơ đồ (FR-APT-06), đổi/hủy lịch không còn ở trạng thái Đã đặt, hoặc cập nhật buổi khám sai thời điểm (mục 5.5); `details.status` là trạng thái hiện tại |
 | 409 | `PROPOSAL_EXPIRED`, `PROPOSAL_NOT_PENDING` | Đề xuất quá 10 phút, hoặc đã bị từ chối/thay thế (BR-06) |
 | 409 | `SHIFT_OVERLAP`, `EMAIL_TAKEN`, `ALREADY_REVIEWED` | Ca chồng ca; email đã tồn tại; lịch đã được đánh giá |
 | 422 | `VALIDATION_ERROR` | Sai định dạng dữ liệu; `details.fields` liệt kê lỗi từng trường |
-| 429 | `RATE_LIMITED`, `ACCOUNT_LOCKED`, `AGENT_QUOTA_EXCEEDED` | Quá 10 lần đăng nhập/phút/IP; tài khoản bị khóa 15 phút; quá 50 tin nhắn Agent/ngày |
+| 429 | `RATE_LIMITED`, `ACCOUNT_LOCKED`, `AGENT_QUOTA_EXCEEDED` | Vượt giới hạn tốc độ (mục 4.6), ví dụ quá 10 lần đăng nhập/phút/IP hoặc quá 10 lần đặt, đổi, hủy lịch/phút/người dùng; tài khoản bị khóa 15 phút; quá 50 tin nhắn Agent/ngày |
 | 500 | `INTERNAL_ERROR` | Lỗi không lường trước; chỉ trả `request_id`, stack trace nằm trong log và Sentry (NFR-14) |
 | 503 | `AGENT_UNAVAILABLE` | LLM lỗi liên tục (đang ngắt mạch) hoặc đã chạm trần chi phí trong ngày (mục 6.8); trang đặt lịch thông thường vẫn hoạt động |
 
@@ -384,6 +384,8 @@ Ví dụ: ca 08:00–11:30, dịch vụ 20 phút, đã có lịch 08:40–09:10.
 
 Exclusion constraint chỉ biết hai lịch có chồng nhau hay không; nó không biết ca làm và ngày nghỉ. Vì vậy trước khi INSERT hoặc UPDATE, service gọi `ensure_slot_bookable(doctor, service, start_at)`: tính khung của đúng bác sĩ đó trong ngày đó bằng `compute_slots`, rồi kiểm tra `start_at` có trong danh sách hay không. Khi đổi lịch, chính lịch đang đổi được loại khỏi danh sách khoảng bận.
 
+Khi đổi lịch, khung mới hợp lệ nếu có trên lưới bỏ chính lịch đang đổi, hoặc trên lưới vẫn tính lịch đó là bận — lưới mà `/availability` đang hiển thị cho bệnh nhân. Dịch vụ dài ngắn khác nhau làm hai lưới lệch nhau (ví dụ lịch 30 phút đứng trước làm lưới 20 phút bắt đầu lại ở 08:30 thay vì 09:00); khung của lưới thứ hai không chồng lịch nào khác nên dời vào vẫn an toàn, và bệnh nhân không bị báo `SLOT_TAKEN` cho khung vừa thấy trống.
+
 Quy tắc này chặt hơn ERD một chút: giờ bắt đầu phải trùng một khung do Engine sinh ra. Nhờ vậy web, Agent và quản trị luôn dùng chung một lưới giờ, và không ai đặt được giờ "tự nghĩ ra", kể cả khi gọi API trực tiếp hay khi LLM bịa giờ.
 
 Khi `start_at` không có trong danh sách, service phân biệt hai trường hợp bằng cách tính lại lưới chỉ với ca làm và ngày nghỉ (bỏ các lịch hẹn): nếu giờ đó nằm trên lưới này, tức khung từng được hiển thị nhưng vừa có người đặt (hoặc lưới đã dịch sau một lịch vừa đặt), thì trả `409 SLOT_TAKEN` kèm khung thay thế; ngược lại trả `400 SLOT_NOT_OFFERED`. Nhờ vậy cả 20 request tranh cùng một khung đều nhận `SLOT_TAKEN`, dù request đến sau thấy lịch đã commit ngay ở bước kiểm tra chứ chưa tới INSERT (AC-03).
@@ -422,22 +424,30 @@ COMMIT
 --   excl_patient_overlap → 409 PATIENT_OVERLAP
 ```
 
-**Đổi lịch** (UC06, BR-04): là một câu UPDATE trên chính dòng đó, nên mã lịch giữ nguyên và constraint chỉ so khoảng mới với các lịch khác — dời lịch sang khung chồng lên giờ cũ của chính nó vẫn hợp lệ.
+**Đổi lịch** (UC06, BR-04): là một câu UPDATE trên chính dòng đó, nên mã lịch và dịch vụ giữ nguyên, và constraint chỉ so khoảng mới với các lịch khác — dời lịch sang khung chồng lên giờ cũ của chính nó vẫn hợp lệ. Request luôn ghi rõ `doctor_id` (bác sĩ cũ hoặc bác sĩ khác cùng dịch vụ): khung người dùng chọn thuộc lưới của đúng bác sĩ đó, và nhờ vậy service biết bác sĩ cần khóa trước khi khóa lịch hẹn.
 
 ```text
 BEGIN
-  SELECT … FROM appointments WHERE id = :id FOR UPDATE
+  SELECT … FROM appointments WHERE id = :id                         -- đọc không khóa
   policy: chủ sở hữu hoặc quản trị; status = BOOKED;
           nếu là bệnh nhân: start_at − now ≥ 2 giờ                  (BR-08)
-  khóa bác sĩ mới FOR SHARE; kiểm tra BR-07; ensure_slot_bookable (bỏ qua chính lịch này)
-  UPDATE appointments SET doctor_id, start_at, end_at, needs_attention = false, updated_at
+  SELECT … FROM doctors      WHERE user_id = :doctor_id FOR SHARE   -- bác sĩ của khung mới
+  SELECT … FROM appointments WHERE id = :id FOR UPDATE              -- đọc lại, kiểm tra lại policy
+  kiểm tra BR-07; khung mới khác khung cũ
+  ensure_slot_bookable (bỏ qua chính lịch này, mục 5.3)
+  SAVEPOINT; UPDATE appointments SET doctor_id, start_at, end_at, needs_attention = false
   INSERT appointment_history (action = RESCHEDULE, old_value, new_value)
   INSERT notifications (type = RESCHEDULED)
 COMMIT
--- 23P01 → ROLLBACK, lịch cũ còn nguyên (AC-04)
+-- 23P01 tại UPDATE → ROLLBACK TO SAVEPOINT, tìm khung thay thế, rồi ROLLBACK cả transaction:
+--   lịch cũ còn nguyên (AC-04); excl_doctor_overlap → 409 SLOT_TAKEN, excl_patient_overlap → 409 PATIENT_OVERLAP
 ```
 
-**Hủy lịch** (UC07): khóa dòng, kiểm tra như đổi lịch, rồi `UPDATE status = CANCELLED, cancel_reason, needs_attention = false`, ghi history `CANCEL` và email `CANCELLED`. Khung giờ được trả lại ngay vì constraint chỉ áp cho BOOKED/ARRIVED.
+Bác sĩ được khóa trước lịch hẹn, đúng thứ tự bệnh nhân → bác sĩ → lịch hẹn. Thứ tự ngược lại gây deadlock với quản trị thêm ngày nghỉ: quản trị giữ khóa bác sĩ `FOR UPDATE` rồi khóa các lịch cần gắn cờ, trong khi request đổi lịch giữ khóa lịch rồi chờ khóa bác sĩ. Bước đọc không khóa kiểm tra quyền trước, nên người không có quyền không giữ được khóa dòng của lịch người khác; sau khi khóa, policy chạy lại trên dữ liệu mới nhất vì request khác có thể vừa hủy hay dời lịch này.
+
+**Hủy lịch** (UC07): đọc không khóa và kiểm tra quyền như đổi lịch, khóa dòng `FOR UPDATE` rồi kiểm tra lại, sau đó `UPDATE status = CANCELLED, cancel_reason, needs_attention = false`, ghi history `CANCEL` và email `CANCELLED`. Khung giờ được trả lại ngay vì constraint chỉ áp cho BOOKED/ARRIVED. Lý do hủy là dữ liệu cá nhân nên không vào history, log, và bác sĩ không thấy (mục 4.6).
+
+**Đổi trạng thái buổi khám** (FR-DOC-02, FR-APT-06): `PATCH /appointments/{id}/status` chỉ nhận ARRIVED, COMPLETED, NO_SHOW; hủy lịch luôn đi qua `/cancel` để có lý do và email. Khóa dòng lịch hẹn, kiểm tra sơ đồ ở mục 5.5, ghi history `STATUS_CHANGE`; lịch rời BOOKED thì cờ "cần xử lý" cũng được gỡ.
 
 Service gọi `session.flush()` ngay sau INSERT/UPDATE để lỗi constraint nổi lên đúng chỗ và được chuyển thành `AppError`, thay vì bật ra lúc COMMIT ở tầng ngoài. Mỗi lần INSERT lịch hẹn chạy trong một SAVEPOINT, nên lỗi constraint không làm hỏng cả transaction: đặt với "Bác sĩ bất kỳ" mà gặp `excl_doctor_overlap` thì thử bác sĩ kế tiếp ngay trong transaction đó; trùng `uq_appointments_code` thì sinh mã khác (mục 5.6).
 
@@ -456,7 +466,7 @@ stateDiagram-v2
     NO_SHOW --> [*]
 ```
 
-`state_machine.py` giữ bảng chuyển hợp lệ `{BOOKED: {ARRIVED, CANCELLED, NO_SHOW}, ARRIVED: {COMPLETED}}`; mọi chuyển khác trả 409 `INVALID_TRANSITION` (FR-APT-06). Tính cả tạo mới và đổi lịch, sơ đồ có đúng 6 chuyển đổi như SRS 6.2. Mỗi chuyển ghi một dòng `appointment_history` với action `STATUS_CHANGE`, `CANCEL` hoặc `RESCHEDULE`.
+`state_machine.py` giữ bảng chuyển hợp lệ `{BOOKED: {ARRIVED, CANCELLED, NO_SHOW}, ARRIVED: {COMPLETED}}`; mọi chuyển khác trả 409 `INVALID_TRANSITION` (FR-APT-06). Ngoài sơ đồ còn giới hạn thời điểm, cũng trả `INVALID_TRANSITION`: không cập nhật buổi khám của ngày chưa tới; bác sĩ chỉ cập nhật lịch trong ngày hôm nay, quản trị sửa được cả ngày đã qua; chỉ đánh Vắng mặt khi đã tới giờ khám. Tính cả tạo mới và đổi lịch, sơ đồ có đúng 6 chuyển đổi như SRS 6.2. Mỗi chuyển ghi một dòng `appointment_history` với action `STATUS_CHANGE`, `CANCEL` hoặc `RESCHEDULE`.
 
 ### 5.6 Mã lịch hẹn
 
@@ -469,7 +479,7 @@ Thêm ngày nghỉ gồm hai bước, khớp UC15 bước 4–6:
 1. `POST /admin/doctors/{id}/time-offs?dry_run=true` trả danh sách lịch BOOKED nằm trong khoảng nghỉ, không ghi gì.
 2. Quản trị xác nhận, frontend gọi lại không có `dry_run`. Trong một transaction: khóa dòng bác sĩ `FOR UPDATE`, INSERT `time_offs`, đặt `needs_attention = true` cho các lịch bị ảnh hưởng và ghi history `FLAG` với kênh ADMIN.
 
-Xóa hoặc thu hẹp ca làm dùng đúng cơ chế này: lịch nào không còn nằm trong ca nào sau thay đổi sẽ bị gắn cờ. Hệ thống không bao giờ tự hủy lịch. Cờ được gỡ tự động khi quản trị đổi hoặc hủy lịch đó, hoặc gỡ thủ công qua `PATCH /admin/appointments/{id}/attention` (FR-ADM-04). Kiểm tra ca chồng ca (UC15 bước 3) nằm ở service: cùng bác sĩ, cùng thứ, khoảng hiệu lực giao nhau và khoảng giờ giao nhau thì trả 409 `SHIFT_OVERLAP`.
+Xóa hoặc thu hẹp ca làm dùng đúng cơ chế này: lịch nào không còn nằm trong ca nào sau thay đổi sẽ bị gắn cờ. Danh sách lịch bị ảnh hưởng được đọc trước khi khóa từng lịch, nên dưới khóa service kiểm tra lại và bỏ qua lịch vừa được bệnh nhân dời sang bác sĩ hoặc giờ khác. Hệ thống không bao giờ tự hủy lịch. Cờ được gỡ tự động khi lịch được đổi, hủy hoặc rời trạng thái BOOKED, hoặc gỡ thủ công qua `PATCH /admin/appointments/{id}/attention` (FR-ADM-04). Bệnh nhân thấy lịch của mình đang "cần xử lý" (phòng khám sẽ liên hệ), còn dòng history `FLAG` là việc nội bộ nên chỉ quản trị thấy. Kiểm tra ca chồng ca (UC15 bước 3) nằm ở service: cùng bác sĩ, cùng thứ, khoảng hiệu lực giao nhau và khoảng giờ giao nhau thì trả 409 `SHIFT_OVERLAP`.
 
 ## 6. Thiết kế AI Agent
 
@@ -519,8 +529,8 @@ Bảng 14 ngày giúp mô hình đổi "thứ Bảy tuần sau" thành 17/10/202
 | `search_services` | `query: str`, `specialty_id?: int` | ≤ 5 dịch vụ: id, tên, chuyên khoa, thời lượng, giá tham khảo, `scope_description` | `CatalogService.search_services` |
 | `search_doctors` | `query?: str`, `specialty_id?: int`, `service_id?: int` | ≤ 10 bác sĩ: id, học hàm, họ tên, chuyên khoa | `CatalogService.search_doctors` |
 | `find_available_slots` | `service_id: int`, `date_from: date`, `date_to: date` (≤ 14 ngày), `doctor_id?: int`, `part_of_day?: morning\|afternoon\|evening`, `limit ≤ 10` | `slots` (doctor_id, tên bác sĩ, `start_at`, `end_at` dạng ISO có `+07:00`, nhãn "Thứ Bảy 17/10, 08:00–08:20"), `nearest_dates`, `alternatives` | `SchedulingService.find_slots` |
-| `get_my_appointments` | `scope: upcoming\|history` | id, mã, dịch vụ, bác sĩ, thời gian, trạng thái, `can_change` (theo BR-08) | `AppointmentService.list_for_patient` |
-| `propose_booking` | `action: BOOK\|RESCHEDULE\|CANCEL`; BOOK: `service_id`, `doctor_id`, `start_at`, `reason?`; RESCHEDULE: `appointment_id`, `start_at`, `doctor_id?`; CANCEL: `appointment_id`, `cancel_reason?` | `proposal_id`, `expires_at`, tóm tắt, lời nhắc "chờ bệnh nhân bấm Xác nhận trên thẻ" | `ProposalService.create` |
+| `get_my_appointments` | `scope: upcoming\|history` | id, mã, dịch vụ, bác sĩ, thời gian, trạng thái, `can_change` (theo BR-08) | `AppointmentService.list_mine` |
+| `propose_booking` | `action: BOOK\|RESCHEDULE\|CANCEL`; BOOK: `service_id`, `doctor_id`, `start_at`, `reason?`; RESCHEDULE: `appointment_id`, `start_at`, `doctor_id`; CANCEL: `appointment_id`, `cancel_reason?` | `proposal_id`, `expires_at`, tóm tắt, lời nhắc "chờ bệnh nhân bấm Xác nhận trên thẻ" | `ProposalService.create` |
 | `handoff_to_staff` | `summary: str` (≤ 1.000 ký tự) | `support_request_id` | `SupportService.create` |
 
 - Không tool nào nhận `patient_id`. Mọi tool đi qua decorator `@agent_tool`: kiểm tra tham số bằng Pydantic; lấy `AgentContext(patient_id, conversation_id, now)` từ `config["configurable"]` của LangGraph (phần này không nằm trong schema mà LLM nhìn thấy); đo thời gian; bắt `AppError` và trả `{error: code, message}`; ghi một dòng `tool_call_logs` gồm args, result, success, latency_ms (FR-AGT-08).
@@ -728,11 +738,11 @@ API là REST + JSON với tiền tố `/api/v1`, một bộ endpoint dùng chung
 | Endpoint | Vai trò | Mô tả | Yêu cầu |
 | --- | --- | --- | --- |
 | `POST /appointments` | Bệnh nhân | Đặt lịch; `doctor_id` rỗng nghĩa là bác sĩ bất kỳ | FR-APT-01 |
-| `GET /appointments/me?scope=upcoming\|history&status=` | Bệnh nhân | Lịch sắp tới và lịch sử | FR-APT-04 |
-| `GET /appointments/{id}` (mới) | Chủ lịch, bác sĩ của lịch, quản trị | Chi tiết, ghi chú bác sĩ, lịch sử thay đổi | FR-APT-05, FR-DOC-03 |
-| `PATCH /appointments/{id}/reschedule` | Bệnh nhân (còn ≥ 2 giờ), quản trị | Đổi lịch, giữ nguyên mã | FR-APT-02, FR-ADM-03 |
-| `POST /appointments/{id}/cancel` | Bệnh nhân (còn ≥ 2 giờ), quản trị | Hủy kèm lý do | FR-APT-03, FR-ADM-03 |
-| `PATCH /appointments/{id}/status` | Bác sĩ, quản trị | Đổi trạng thái theo sơ đồ | FR-DOC-02, FR-APT-06 |
+| `GET /appointments/me?scope=upcoming\|history&status=&page=&page_size=` | Bệnh nhân | Sắp tới: lịch Đã đặt, Đã đến chưa kết thúc, gần nhất trước. Lịch sử: mọi lịch còn lại, mới nhất trước. Phân trang theo mục 8.1 | FR-APT-04 |
+| `GET /appointments/{id}` (mới) | Chủ lịch, bác sĩ của lịch, quản trị | Chi tiết, ghi chú bác sĩ, bệnh nhân (họ tên, tuổi), lịch sử thay đổi (vai trò người thao tác, kênh, cũ → mới); dòng `FLAG` chỉ quản trị thấy | FR-APT-05, FR-DOC-03 |
+| `PATCH /appointments/{id}/reschedule` | Bệnh nhân (còn ≥ 2 giờ), quản trị | Đổi lịch, giữ nguyên mã và dịch vụ; body `{start_at, doctor_id}` | FR-APT-02, FR-ADM-03 |
+| `POST /appointments/{id}/cancel` | Bệnh nhân (còn ≥ 2 giờ), quản trị | Hủy kèm lý do tùy chọn `{reason}` | FR-APT-03, FR-ADM-03 |
+| `PATCH /appointments/{id}/status` | Bác sĩ (lịch của mình, trong ngày), quản trị | Đổi trạng thái theo sơ đồ; body `{status: ARRIVED\|COMPLETED\|NO_SHOW}` | FR-DOC-02, FR-APT-06 |
 | `PATCH /appointments/{id}/note` (mới) | Bác sĩ của lịch | Ghi chú sau khám ≤ 1.000 ký tự | FR-DOC-03 |
 | `POST /appointments/{id}/review` (mới, P2) | Bệnh nhân | Đánh giá lịch đã COMPLETED | FR-RPT-02 |
 | `GET /doctor/schedule?from=&to=` | Bác sĩ | Lịch khám ngày/tuần của chính mình | FR-DOC-01 |
@@ -815,7 +825,27 @@ Content-Type: application/json
 }
 ```
 
-Thành công trả `201 Created`; khung vừa bị đặt trả `409 SLOT_TAKEN` như ví dụ ở mục 4.7. `POST /agent/proposals/{id}/confirm` trả cùng cấu trúc lịch hẹn này (với `channel: "AGENT"`) kèm `proposal.status`, nên frontend dùng chung một component hiển thị kết quả.
+Thành công trả `201 Created`; khung vừa bị đặt trả `409 SLOT_TAKEN` như ví dụ ở mục 4.7. `can_change` cho biết người gọi còn đổi, hủy được không; `change_until` là hạn đổi, hủy trực tuyến của bệnh nhân (giờ khám − 2 giờ). `POST /agent/proposals/{id}/confirm` trả cùng cấu trúc lịch hẹn này (với `channel: "AGENT"`) kèm `proposal.status`, nên frontend dùng chung một component hiển thị kết quả.
+
+**Đổi lịch** sang 09:40 thứ Hai, giữ bác sĩ cũ:
+
+```http
+PATCH /api/v1/appointments/412/reschedule
+Authorization: Bearer eyJ...
+Content-Type: application/json
+
+{ "start_at": "2026-10-19T09:40:00+07:00", "doctor_id": 7 }
+```
+
+Thành công trả `200` với cùng cấu trúc lịch hẹn ở trên (mã giữ nguyên). Còn dưới 2 giờ trước giờ khám:
+
+```json
+{
+  "code": "CHANGE_DEADLINE_PASSED",
+  "message": "Chỉ đổi, hủy trực tuyến trước giờ khám ít nhất 2 giờ. Vui lòng gọi phòng khám theo số 028 3822 0000 để được hỗ trợ.",
+  "details": { "clinic_phone": "028 3822 0000" }
+}
+```
 
 ### 8.4 Sự kiện SSE của `/agent/chat`
 

@@ -5,8 +5,9 @@ Access token tạo thẳng bằng `create_access_token` (cùng khóa với app t
 """
 
 from dataclasses import dataclass, field
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Environment, Settings
@@ -35,9 +36,10 @@ class Clinic:
     emails: dict[int, str] = field(default_factory=dict)
 
 
-def bearer(user_id: int, role: UserRole) -> dict[str, str]:
+def bearer(user_id: int, role: UserRole, issued_at: datetime = TEST_NOW) -> dict[str, str]:
+    """Access token sống 30 phút: test tua đồng hồ thì cấp token tại thời điểm mới."""
     user = User(id=user_id, role=role)
-    token, _ = create_access_token(user, TEST_NOW, APP_SETTINGS)
+    token, _ = create_access_token(user, issued_at, APP_SETTINGS)
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -114,6 +116,7 @@ async def build_clinic(db: AsyncSession, *, doctors: int = 2, patients: int = 2)
                 password_hash="x",
                 role=UserRole.PATIENT,
                 full_name=f"Bệnh Nhân {i}",
+                phone=f"09000000{i:02d}",
             )
             db.add(user)
             await db.flush()
@@ -139,23 +142,38 @@ async def add_appointment(
     minutes: int = 20,
     status: AppointmentStatus = AppointmentStatus.BOOKED,
     code: str | None = None,
+    service_id: int | None = None,
+    needs_attention: bool = False,
 ) -> int:
     """Ghi thẳng một lịch hẹn (bỏ qua service) để dựng tình huống cho test."""
     start_at = local_datetime(day, start)
     async with db.begin():
         appointment = Appointment(
-            code=code or f"LH-TEST-{start:%H%M}{doctor_index}{patient_index}",
+            code=code or f"LH-TEST-{day:%d}{start:%H%M}{doctor_index}{patient_index}",
             patient_id=clinic.patient_ids[patient_index],
             doctor_id=clinic.doctor_ids[doctor_index],
-            service_id=clinic.service_id,
+            service_id=service_id or clinic.service_id,
             start_at=start_at,
             end_at=start_at + timedelta(minutes=minutes),
             status=status,
             channel=Channel.WEB,
+            needs_attention=needs_attention,
         )
         db.add(appointment)
         await db.flush()
         return appointment.id
+
+
+async def fetch(db: AsyncSession, appointment_id: int) -> Appointment:
+    """Đọc lại lịch hẹn từ database (bỏ bản cũ trong identity map của session test)."""
+    stmt = (
+        select(Appointment)
+        .where(Appointment.id == appointment_id)
+        .execution_options(populate_existing=True)
+    )
+    appointment = (await db.execute(stmt)).scalar_one()
+    await db.commit()  # đóng transaction tự mở của session test
+    return appointment
 
 
 async def add_time_off(

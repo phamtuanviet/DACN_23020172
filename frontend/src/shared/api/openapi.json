@@ -1116,7 +1116,7 @@
           "appointments"
         ],
         "summary": "Book Appointment",
-        "description": "Đặt lịch cho chính mình (UC05, FR-APT-01). `doctor_id` rỗng: bác sĩ bất kỳ.\n\nLỗi: BOOKING_WINDOW, SLOT_NOT_OFFERED, DOCTOR_SERVICE_MISMATCH (400); SLOT_TAKEN kèm\n`details.alternatives`, PATIENT_OVERLAP, MAX_ACTIVE_APPOINTMENTS (409).",
+        "description": "Đặt lịch cho chính mình (UC05, FR-APT-01). `doctor_id` rỗng: bác sĩ bất kỳ.\n\nLỗi: BOOKING_WINDOW, SLOT_NOT_OFFERED, DOCTOR_SERVICE_MISMATCH (400); SLOT_TAKEN kèm\n`details.alternatives`, PATIENT_OVERLAP, MAX_ACTIVE_APPOINTMENTS (409); RATE_LIMITED (429)\nkhi đặt, đổi, hủy quá 10 lần/phút.",
         "operationId": "book_appointment_api_v1_appointments_post",
         "requestBody": {
           "content": {
@@ -1155,6 +1155,326 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/appointments/me": {
+      "get": {
+        "tags": [
+          "appointments"
+        ],
+        "summary": "My Appointments",
+        "description": "Lịch sắp tới (gần nhất trước) và lịch sử (mới nhất trước), lọc theo trạng thái (UC08).",
+        "operationId": "my_appointments_api_v1_appointments_me_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Scope",
+              "description": "upcoming: sắp tới; history: lịch sử",
+              "default": "upcoming"
+            },
+            "description": "upcoming: sắp tới; history: lịch sử"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AppointmentStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointments/{appointment_id}": {
+      "get": {
+        "tags": [
+          "appointments"
+        ],
+        "summary": "Get Appointment",
+        "description": "Chi tiết, ghi chú bác sĩ, lịch sử thay đổi. Chủ lịch, bác sĩ của lịch, quản trị; người khác\nnhận 403 (AC-05).",
+        "operationId": "get_appointment_api_v1_appointments__appointment_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Appointment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointments/{appointment_id}/reschedule": {
+      "patch": {
+        "tags": [
+          "appointments"
+        ],
+        "summary": "Reschedule Appointment",
+        "description": "Đổi lịch, giữ nguyên mã và dịch vụ (UC06, FR-APT-02, FR-ADM-03).\n\nLỗi: như đặt lịch; thêm CHANGE_DEADLINE_PASSED kèm `details.clinic_phone` khi bệnh nhân còn\ndưới 2 giờ, INVALID_TRANSITION khi lịch không còn ở trạng thái Đã đặt (409). Thất bại thì lịch\ncũ giữ nguyên (AC-04).",
+        "operationId": "reschedule_appointment_api_v1_appointments__appointment_id__reschedule_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Appointment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointments/{appointment_id}/cancel": {
+      "post": {
+        "tags": [
+          "appointments"
+        ],
+        "summary": "Cancel Appointment",
+        "description": "Hủy lịch kèm lý do tùy chọn (UC07, FR-APT-03). Lỗi: CHANGE_DEADLINE_PASSED,\nINVALID_TRANSITION (409).",
+        "operationId": "cancel_appointment_api_v1_appointments__appointment_id__cancel_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Appointment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointments/{appointment_id}/status": {
+      "patch": {
+        "tags": [
+          "appointments"
+        ],
+        "summary": "Change Appointment Status",
+        "description": "Đã đến, Đã khám, Vắng mặt theo sơ đồ trạng thái (FR-APT-06, FR-DOC-02). Bác sĩ chỉ cập\nnhật lịch của mình trong ngày; chuyển sai sơ đồ trả 409 INVALID_TRANSITION.",
+        "operationId": "change_appointment_status_api_v1_appointments__appointment_id__status_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Appointment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusChangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/admin/doctors/{doctor_id}/shifts": {
@@ -1666,6 +1986,133 @@
         "title": "AffectedOut",
         "description": "Lịch BOOKED sắp tới bị ảnh hưởng: nằm trong ngày nghỉ hoặc không còn nằm trong ca nào."
       },
+      "AppointmentDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Mã lịch hẹn LH-YYMMDD-XXXX"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AppointmentStatus"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
+          "service": {
+            "$ref": "#/components/schemas/ServiceRef"
+          },
+          "doctor": {
+            "$ref": "#/components/schemas/DoctorRef"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "can_change": {
+            "type": "boolean",
+            "title": "Can Change",
+            "description": "Người gọi còn đổi, hủy được không (BR-08)"
+          },
+          "change_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Until",
+            "description": "Hạn đổi, hủy trực tuyến của bệnh nhân (giờ khám − 2 giờ); rỗng khi không còn là lịch Đã đặt"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "cancel_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Reason"
+          },
+          "doctor_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Note"
+          },
+          "needs_attention": {
+            "type": "boolean",
+            "title": "Needs Attention",
+            "description": "Bác sĩ nghỉ hoặc đổi ca: phòng khám sẽ liên hệ"
+          },
+          "patient": {
+            "$ref": "#/components/schemas/PatientBrief"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            },
+            "type": "array",
+            "title": "History"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "status",
+          "channel",
+          "service",
+          "doctor",
+          "start_at",
+          "end_at",
+          "can_change",
+          "change_until",
+          "reason",
+          "cancel_reason",
+          "doctor_note",
+          "needs_attention",
+          "patient",
+          "created_at",
+          "history"
+        ],
+        "title": "AppointmentDetail"
+      },
       "AppointmentOut": {
         "properties": {
           "id": {
@@ -1702,7 +2149,20 @@
           "can_change": {
             "type": "boolean",
             "title": "Can Change",
-            "description": "Bệnh nhân còn đổi, hủy được không (BR-08)"
+            "description": "Người gọi còn đổi, hủy được không (BR-08)"
+          },
+          "change_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Until",
+            "description": "Hạn đổi, hủy trực tuyến của bệnh nhân (giờ khám − 2 giờ); rỗng khi không còn là lịch Đã đặt"
           }
         },
         "type": "object",
@@ -1715,9 +2175,41 @@
           "doctor",
           "start_at",
           "end_at",
-          "can_change"
+          "can_change",
+          "change_until"
         ],
         "title": "AppointmentOut"
+      },
+      "AppointmentPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AppointmentOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "AppointmentPage"
       },
       "AppointmentStatus": {
         "type": "string",
@@ -1808,6 +2300,25 @@
           "start_at"
         ],
         "title": "BookRequest"
+      },
+      "CancelRequest": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Lý do hủy, tùy chọn, tối đa 500 ký tự"
+          }
+        },
+        "type": "object",
+        "title": "CancelRequest"
       },
       "ChangePasswordRequest": {
         "properties": {
@@ -2060,6 +2571,142 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HistoryAction": {
+        "type": "string",
+        "enum": [
+          "CREATE",
+          "RESCHEDULE",
+          "CANCEL",
+          "STATUS_CHANGE",
+          "NOTE_UPDATE",
+          "FLAG"
+        ],
+        "title": "HistoryAction"
+      },
+      "HistoryEntry": {
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/HistoryAction"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
+          "actor_role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserRole"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Rỗng: tác vụ hệ thống"
+          },
+          "by_me": {
+            "type": "boolean",
+            "title": "By Me",
+            "description": "Người đang xem chính là người thao tác"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "old": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HistoryState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "new": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HistoryState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "channel",
+          "actor_role",
+          "by_me",
+          "created_at",
+          "old",
+          "new"
+        ],
+        "title": "HistoryEntry",
+        "description": "Một dòng lịch sử thay đổi: ai, khi nào, kênh nào, cũ → mới (FR-APT-05)."
+      },
+      "HistoryState": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppointmentStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "doctor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DoctorRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "needs_attention": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Needs Attention"
+          }
+        },
+        "type": "object",
+        "title": "HistoryState"
+      },
       "LoginRequest": {
         "properties": {
           "email": {
@@ -2143,6 +2790,38 @@
         ],
         "title": "MeResponse"
       },
+      "PatientBrief": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age",
+            "description": "Tuổi tính từ ngày sinh"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "age"
+        ],
+        "title": "PatientBrief",
+        "description": "Bác sĩ chỉ thấy họ tên và tuổi, không thấy email, số điện thoại (docs mục 4.6)."
+      },
       "RegisterRequest": {
         "properties": {
           "full_name": {
@@ -2190,6 +2869,39 @@
           "privacy_consent"
         ],
         "title": "RegisterRequest"
+      },
+      "RescheduleRequest": {
+        "properties": {
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At",
+            "description": "Giờ bắt đầu của một khung do /availability trả về"
+          },
+          "doctor_id": {
+            "type": "integer",
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
+            "title": "Doctor Id",
+            "description": "Bác sĩ hiện tại hoặc một bác sĩ khác cùng dịch vụ"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_at",
+          "doctor_id"
+        ],
+        "title": "RescheduleRequest",
+        "description": "Đổi lịch giữ nguyên dịch vụ và mã lịch (UC06).\n\n`doctor_id` bắt buộc, kể cả khi giữ bác sĩ cũ: khung giờ người dùng chọn thuộc lưới của đúng\nbác sĩ đó, và service khóa bác sĩ này trước khi khóa lịch hẹn (docs mục 5.4)."
+      },
+      "Scope": {
+        "type": "string",
+        "enum": [
+          "upcoming",
+          "history"
+        ],
+        "title": "Scope",
+        "description": "Sắp tới: lịch Đã đặt, Đã đến chưa kết thúc. Lịch sử: mọi lịch còn lại (FR-APT-04)."
       },
       "ServiceAdminOut": {
         "properties": {
@@ -2904,6 +3616,25 @@
         "type": "object",
         "title": "SpecialtyUpdate",
         "description": "Chỉ trường được gửi mới đổi; ẩn hoặc hiện lại bằng `is_active`."
+      },
+      "StatusChangeRequest": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ARRIVED",
+              "COMPLETED",
+              "NO_SHOW"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "StatusChangeRequest",
+        "description": "Hủy lịch đi qua `/cancel` để có lý do và email; endpoint này chỉ dành cho buổi khám."
       },
       "TimeOffChangeOut": {
         "properties": {

@@ -148,7 +148,7 @@ class ScheduleService:
                 for field, value in merged.model_dump().items():
                     setattr(shift, field, value)
                 await self._session.flush()
-                await self._flag(actor, affected, source="SHIFT_CHANGE", ref_id=shift_id)
+                await self._flag(actor, doctor_id, affected, source="SHIFT_CHANGE", ref_id=shift_id)
             result = ShiftChangeOut(
                 dry_run=dry_run,
                 shift=ShiftOut(id=shift_id, doctor_id=doctor_id, **merged.model_dump()),
@@ -172,7 +172,7 @@ class ScheduleService:
             if not dry_run:
                 await self._session.delete(shift)
                 await self._session.flush()
-                await self._flag(actor, affected, source="SHIFT_DELETE", ref_id=shift_id)
+                await self._flag(actor, doctor_id, affected, source="SHIFT_DELETE", ref_id=shift_id)
         if not dry_run:
             log.info("schedule.shift_deleted", shift_id=shift_id, flagged=len(affected))
         return ShiftChangeOut(
@@ -213,7 +213,7 @@ class ScheduleService:
                 row = TimeOff(doctor_id=doctor_id, created_by=actor.user_id, **data.model_dump())
                 self._session.add(row)
                 await self._session.flush()
-                await self._flag(actor, affected, source="TIME_OFF", ref_id=row.id)
+                await self._flag(actor, doctor_id, affected, source="TIME_OFF", ref_id=row.id)
                 time_off = _time_off_out(row)
         if time_off is not None:
             log.info("schedule.time_off_created", time_off_id=time_off.id, flagged=len(affected))
@@ -265,12 +265,19 @@ class ScheduleService:
         return result
 
     async def _flag(
-        self, actor: Actor, affected: list[AffectedAppointment], *, source: str, ref_id: int
+        self,
+        actor: Actor,
+        doctor_id: int,
+        affected: list[AffectedAppointment],
+        *,
+        source: str,
+        ref_id: int,
     ) -> None:
         await flag_for_attention(
             self._session,
             actor,
-            [a.id for a in affected],
+            doctor_id,
+            affected,
             source={"source": source, "ref_id": ref_id},
         )
 

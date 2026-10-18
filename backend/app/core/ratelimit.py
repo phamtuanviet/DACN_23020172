@@ -5,11 +5,13 @@
 - IP thật lấy từ `request.client`: ở staging/production Uvicorn chạy
   `--proxy-headers` sau Caddy, và Caddy chỉ tin IP của Cloudflare (docs mục 11.3).
 - Valkey lỗi thì không chặn người dùng (swallow_errors) mà tạm đếm trong bộ nhớ tiến trình.
+- Đặt, đổi, hủy lịch: 10 lần/phút/người dùng (mỗi lần sinh một email, chặn spam email và dò id).
 - Vượt giới hạn: slowapi ném RateLimitExceeded (HTTP 429), handler chung đổi thành `RATE_LIMITED`.
 
-Còn lại: giới hạn API chung 300 lần/phút/người dùng (làm cùng các module cần đăng nhập).
+Còn lại: giới hạn API chung 300 lần/phút/người dùng cho mọi endpoint cần đăng nhập.
 """
 
+from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -19,6 +21,15 @@ LOGIN_LIMIT = "10/minute"
 REGISTER_LIMIT = "5/minute"
 REFRESH_LIMIT = "60/minute"
 PASSWORD_CHANGE_LIMIT = "5/minute"
+APPOINTMENT_WRITE_LIMIT = "10/minute"
+
+
+def user_or_ip(request: Request) -> str:
+    """Khóa đếm theo người dùng đã xác thực (`get_current_user` ghi vào request.state), không có
+    thì theo IP. slowapi kiểm giới hạn sau khi FastAPI đã chạy xong dependency xác thực."""
+    user_id = getattr(request.state, "user_id", None)
+    return f"user:{user_id}" if user_id is not None else get_remote_address(request)
+
 
 limiter = Limiter(
     key_func=get_remote_address,

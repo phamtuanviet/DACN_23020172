@@ -102,3 +102,14 @@ async def db(app_client: AsyncClient) -> AsyncIterator[AsyncSession]:
     """Session riêng để chuẩn bị hoặc kiểm tra dữ liệu ngoài API."""
     async with get_sessionmaker()() as session:
         yield session
+
+
+@pytest.fixture
+def wide_pool(monkeypatch: pytest.MonkeyPatch, test_database_url: str) -> Iterator[None]:
+    """Pool mặc định 4 + 2 kết nối sẽ xếp hàng các request; nới ra để test đồng thời chạy song
+    song thật (mỗi request một transaction trên kết nối riêng)."""
+    monkeypatch.setenv("DB_POOL_SIZE", "25")
+    _clear_caches()
+    yield
+    monkeypatch.undo()
+    _clear_caches()

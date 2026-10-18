@@ -62,3 +62,40 @@ def test_only_patients_reach_booking(client: TestClient, user: CurrentUser) -> N
 
 def test_booking_without_token_returns_401(client: TestClient) -> None:
     assert client.post("/api/v1/appointments", json={}).status_code == 401
+
+
+ADMIN = CurrentUser(id=3, role=UserRole.ADMIN, full_name="Hà")
+APPOINTMENT_ROUTES = _routes("/api/v1/appointments")
+# Vai trò bị router chặn (lớp 1) ở từng route lịch hẹn (docs mục 4.6, 8.2)
+APPOINTMENT_FORBIDDEN = [
+    ("POST", "/api/v1/appointments", DOCTOR),
+    ("POST", "/api/v1/appointments", ADMIN),
+    ("GET", "/api/v1/appointments/me", DOCTOR),
+    ("GET", "/api/v1/appointments/me", ADMIN),
+    ("PATCH", "/api/v1/appointments/1/reschedule", DOCTOR),
+    ("POST", "/api/v1/appointments/1/cancel", DOCTOR),
+    ("PATCH", "/api/v1/appointments/1/status", PATIENT),
+]
+
+
+def test_appointment_routes_are_discovered() -> None:
+    assert len(APPOINTMENT_ROUTES) == 6  # đặt, của tôi, chi tiết, đổi, hủy, đổi trạng thái
+
+
+@pytest.mark.parametrize(("method", "path"), APPOINTMENT_ROUTES)
+def test_appointment_route_without_token_returns_401(
+    client: TestClient, method: str, path: str
+) -> None:
+    response = client.request(method, path, json={})
+    assert response.status_code == 401
+    assert response.json()["code"] == "UNAUTHENTICATED"
+
+
+@pytest.mark.parametrize(("method", "path", "user"), APPOINTMENT_FORBIDDEN)
+def test_appointment_route_rejects_wrong_role_with_403(
+    client: TestClient, method: str, path: str, user: CurrentUser
+) -> None:
+    client.app.dependency_overrides[get_current_user] = lambda: user  # type: ignore[attr-defined]
+    response = client.request(method, path, json={})
+    assert response.status_code == 403
+    assert response.json()["code"] == "FORBIDDEN"

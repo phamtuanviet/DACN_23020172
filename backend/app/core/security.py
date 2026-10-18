@@ -154,6 +154,7 @@ class CurrentUser:
 
 
 async def get_current_user(
+    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     clock: ClockDep,
     settings: SettingsDep,
@@ -171,6 +172,7 @@ async def get_current_user(
     if user is None or not user.is_active or user.anonymized_at is not None:
         raise _unauthenticated()
     structlog.contextvars.bind_contextvars(user_id=user.id)
+    request.state.user_id = user.id  # khóa đếm của giới hạn tốc độ theo người dùng
     return CurrentUser(id=user.id, role=user.role, full_name=user.full_name)
 
 
@@ -211,3 +213,7 @@ def actor_with_roles(*roles: UserRole) -> Callable[[CurrentUser], Awaitable[Acto
 ActorDep = Annotated[Actor, Depends(get_actor)]
 AdminActorDep = Annotated[Actor, Depends(actor_with_roles(UserRole.ADMIN))]
 PatientActorDep = Annotated[Actor, Depends(actor_with_roles(UserRole.PATIENT))]
+PatientOrAdminActorDep = Annotated[
+    Actor, Depends(actor_with_roles(UserRole.PATIENT, UserRole.ADMIN))
+]
+DoctorOrAdminActorDep = Annotated[Actor, Depends(actor_with_roles(UserRole.DOCTOR, UserRole.ADMIN))]

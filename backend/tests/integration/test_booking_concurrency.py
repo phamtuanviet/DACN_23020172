@@ -6,7 +6,6 @@ transaction thật sự chồng lên nhau: chính exclusion constraint quyết �
 
 import asyncio
 from collections import Counter
-from collections.abc import Iterator
 
 import pytest
 from httpx import AsyncClient
@@ -15,22 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import UserRole
 from app.db.models.appointments import Appointment
-from tests.integration.conftest import _clear_caches
 from tests.integration.factories import MONDAY, at, bearer, build_clinic
 
 pytestmark = pytest.mark.integration
 
 CONCURRENT_REQUESTS = 20
-
-
-@pytest.fixture
-def wide_pool(monkeypatch: pytest.MonkeyPatch, test_database_url: str) -> Iterator[None]:
-    """Pool mặc định 4 + 2 kết nối sẽ xếp hàng các request; nới ra để 20 request chạy song song."""
-    monkeypatch.setenv("DB_POOL_SIZE", str(CONCURRENT_REQUESTS + 5))
-    _clear_caches()
-    yield
-    monkeypatch.undo()
-    _clear_caches()
 
 
 async def test_twenty_patients_booking_the_same_slot_create_exactly_one_appointment(

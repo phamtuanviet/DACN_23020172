@@ -169,6 +169,11 @@ async def ensure_slot_bookable(
     transaction của người gọi, sau khi đã khóa dòng bác sĩ `FOR SHARE`.
     - `SLOT_NOT_OFFERED`: giờ này không thuộc lưới giờ (ngoài ca, trong ngày nghỉ, lệch bước).
     - `SLOT_TAKEN`: lưới giờ có khung này nhưng lịch khác đã chiếm (kèm khung thay thế).
+
+    Đổi lịch (`exclude_appointment_id`): khung hợp lệ nếu có trên lưới bỏ chính lịch đang đổi,
+    hoặc trên lưới vẫn tính lịch đó là bận — lưới mà /availability đang hiển thị. Lịch dài ngắn
+    khác nhau làm hai lưới lệch nhau; khung của lưới thứ hai không chồng lịch nào khác nên dời
+    vào vẫn an toàn.
     """
     day = to_local(start_at).date()
     snapshot = await load_snapshot(
@@ -183,8 +188,10 @@ async def ensure_slot_bookable(
         raise doctor_service_mismatch()
     shifts = snapshot.doctors.shifts
     duration = timedelta(minutes=service.duration_min)
-    slots = compute_slots(shifts, snapshot.busy(), duration, [day], window.now, window.end)
-    free = [s.doctor_id for s in slots if s.start == start_at]
+    free = _free_doctors(snapshot, duration, day, start_at, window)
+    if not free and exclude_appointment_id is not None:
+        snapshot = await load_snapshot(session, [service.id], day, day, doctor_id=doctor_id)
+        free = _free_doctors(snapshot, duration, day, start_at, window)
     if free:
         candidates = [
             Candidate(d, snapshot.doctors.names[d], snapshot.booked_count(d, day)) for d in free
@@ -194,6 +201,15 @@ async def ensure_slot_bookable(
     if any(s.start == start_at for s in offered):
         raise await slot_taken(session, service, start_at, window, doctor_id=doctor_id)
     raise slot_not_offered()
+
+
+def _free_doctors(
+    snapshot: Snapshot, duration: timedelta, day: date, start_at: datetime, window: BookingWindow
+) -> list[int]:
+    slots = compute_slots(
+        snapshot.doctors.shifts, snapshot.busy(), duration, [day], window.now, window.end
+    )
+    return [s.doctor_id for s in slots if s.start == start_at]
 
 
 async def slot_taken(
