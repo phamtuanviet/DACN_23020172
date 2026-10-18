@@ -34,10 +34,10 @@ export function SiteHeader() {
             <Link
               key={link.href}
               href={link.href}
-              aria-current={isNavLinkActive(link, pathname, search) ? "page" : undefined}
+              aria-current={isNavLinkActive(link, pathname, search, links) ? "page" : undefined}
               className={cn(
                 "rounded-control px-3.5 py-2.5 whitespace-nowrap",
-                isNavLinkActive(link, pathname, search)
+                isNavLinkActive(link, pathname, search, links)
                   ? "bg-primary-soft font-semibold text-primary-ink"
                   : "hover:bg-ground",
               )}
@@ -95,7 +95,7 @@ export function SiteHeader() {
             <Link
               key={link.href}
               href={link.href}
-              aria-current={isNavLinkActive(link, pathname, search) ? "page" : undefined}
+              aria-current={isNavLinkActive(link, pathname, search, links) ? "page" : undefined}
               onClick={() => setMenuOpen(false)}
               className="block rounded-control px-3 py-3 font-medium hover:bg-ground"
             >

@@ -32,11 +32,24 @@ export function isActive(pathname: string, href: string): boolean {
   return path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(`${path}/`);
 }
 
+const tabOf = (href: string) => new URLSearchParams(href.split("?")[1] ?? "").get("tab");
+
 /** Như `isActive` nhưng phân biệt hai mục cùng đường dẫn bằng `tab` (Dịch vụ và Bác sĩ cùng là
- *  /services, khác ở ?tab=doctors). */
-export function isNavLinkActive(link: NavLink, pathname: string, search: string): boolean {
+ *  /services, khác ở ?tab=doctors). `tab` của trang khác (Lịch của tôi ?tab=history) không làm
+ *  mất trạng thái đang mở, vì không mục nào khác trong `links` dùng giá trị đó. */
+export function isNavLinkActive(
+  link: NavLink,
+  pathname: string,
+  search: string,
+  links: NavLink[],
+): boolean {
   if (link.also?.some((path) => isActive(pathname, path))) return true;
   if (!isActive(pathname, link.href)) return false;
-  const wanted = new URLSearchParams(link.href.split("?")[1] ?? "").get("tab");
-  return wanted === new URLSearchParams(search).get("tab");
+  const current = new URLSearchParams(search).get("tab");
+  const wanted = tabOf(link.href);
+  if (wanted !== null) return wanted === current;
+  const path = link.href.split("?")[0];
+  return !links.some(
+    (other) => other !== link && other.href.split("?")[0] === path && tabOf(other.href) === current,
+  );
 }

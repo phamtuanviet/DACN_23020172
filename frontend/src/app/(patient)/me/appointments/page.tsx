@@ -1,11 +1,14 @@
-import { PagePlaceholder } from "@/shared/ui/page-placeholder";
+import type { Metadata } from "next";
+import { Suspense } from "react";
+
+import { MyAppointmentsPage } from "@/features/my-appointments";
+
+export const metadata: Metadata = { title: "Lịch của tôi" };
 
 export default function Page() {
   return (
-    <PagePlaceholder
-      sprint={3}
-      title="Lịch của tôi"
-      description="Sắp tới, lịch sử, đổi, hủy (UC06–UC08)."
-    />
+    <Suspense>
+      <MyAppointmentsPage />
+    </Suspense>
   );
 }
