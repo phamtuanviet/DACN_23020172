@@ -24,6 +24,22 @@ async function expectNoHorizontalScroll(page: Page) {
   expect(overflow).toBeLessThanOrEqual(0);
 }
 
+/** Chọn ngày còn khung từ ngày mai trở đi: lịch hôm nay có thể đã dưới 2 giờ, không đổi được. */
+async function pickLaterDay(page: Page) {
+  const calendar = page.getByRole("group", { name: "Chọn ngày khám" });
+  const open = calendar.getByRole("button", { name: /\d+ khung$/ });
+  await expect(open.first()).toBeVisible();
+  if ((await open.count()) < 2) await page.getByRole("button", { name: "Tháng sau" }).click();
+  const day = (await open.count()) > 1 ? open.nth(1) : open.first();
+  const label = (await day.getAttribute("aria-label")) ?? "";
+  await day.click();
+  // Ngày chọn nằm trên URL: chờ đổi xong rồi mới chọn giờ, không thì bấm nhầm khung của ngày cũ.
+  await expect(calendar.getByRole("button", { name: label })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+}
+
 /** Bấm khung giờ còn trống đầu tiên trong danh sách khung (không tính ô ngày của lịch tháng). */
 async function pickFirstSlot(page: Page, scope = page.locator("body")) {
   const slot = scope.getByRole("button", { name: /^\d{2}:\d{2}, / }).first();
@@ -53,6 +69,7 @@ test("bệnh nhân mới đặt lịch đầu tiên, thấy trong Sắp tới, r
   await expect(page.getByRole("heading", { name: "Chọn ngày và giờ" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Chọn ngày khám" })).toBeVisible();
   if (mobile) await expectNoHorizontalScroll(page);
+  await pickLaterDay(page);
   await pickFirstSlot(page);
   await page.getByLabel(/Lý do khám/).fill("Nổi mẩn đỏ ở tay");
   await page.getByRole("button", { name: "Tiếp tục: xem lại" }).click();
@@ -91,6 +108,12 @@ test("bệnh nhân mới đặt lịch đầu tiên, thấy trong Sắp tới, r
   await detail.getByRole("button", { name: "Đổi lịch" }).click();
   const reschedule = page.getByRole("dialog", { name: "Đổi lịch hẹn" });
   await expect(reschedule.getByText(`Mã lịch hẹn giữ nguyên: ${appointmentCode}`)).toBeVisible();
+  // Ngày thứ hai còn khung trong dải 14 ngày: khung của hôm nay có thể đã dưới 2 giờ.
+  const laterDay = reschedule
+    .getByRole("button", { name: /^(T\d|CN) \d{2}\/\d{2}$/, disabled: false })
+    .nth(1);
+  await laterDay.click();
+  await expect(laterDay).toHaveAttribute("aria-pressed", "true");
   await pickFirstSlot(page, reschedule);
   await reschedule.getByRole("button", { name: "Xác nhận đổi lịch" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Đã đổi lịch sang" })).toBeVisible();

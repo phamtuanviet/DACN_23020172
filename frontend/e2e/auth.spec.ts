@@ -11,6 +11,9 @@ async function login(page: Page, email: string, password: string) {
 }
 
 test("đăng ký bệnh nhân mới rồi vào thẳng Lịch của tôi", async ({ page }, testInfo) => {
+  // Đăng ký trên điện thoại đã có trong booking.spec.ts; chạy một project để cả bộ e2e (kể cả
+  // agent.spec.ts) không vượt giới hạn đăng ký 5 lần/phút/IP.
+  test.skip(testInfo.project.name !== "desktop", "chỉ chạy trên máy tính");
   const email = `e2e-${Date.now()}-${testInfo.project.name}@example.com`;
   await page.goto("/register");
   await page.getByLabel("Họ và tên").fill("Người Dùng Thử");
