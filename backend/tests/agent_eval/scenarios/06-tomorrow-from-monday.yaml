@@ -1,0 +1,9 @@
+title: '"Sáng mai" tính từ chiều Thứ Hai là Thứ Ba 13/10 (FR-AGT-03)'
+now: "2026-10-12T15:00:00+07:00"
+turns:
+  - user: Sáng mai tôi muốn khám tai mũi họng
+    expect:
+      tools: [search_services, find_available_slots]
+      args:
+        find_available_slots: {service_id: "@ent", date_from: "2026-10-13", date_to: "2026-10-13", part_of_day: morning}
+      reply_any: ["13/10"]

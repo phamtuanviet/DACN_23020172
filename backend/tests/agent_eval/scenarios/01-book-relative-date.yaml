@@ -1,0 +1,10 @@
+title: Tìm khung khám da liễu sáng thứ Bảy tuần sau (AC-10, FR-AGT-03)
+# Bây giờ: Thứ Bảy 10/10/2026 09:00 → "thứ Bảy tuần sau" là 17/10, buổi sáng.
+turns:
+  - user: Tôi muốn khám da liễu sáng thứ Bảy tuần sau
+    expect:
+      tools: [search_services, find_available_slots]
+      args:
+        find_available_slots: {service_id: "@derm", date_from: "2026-10-17", date_to: "2026-10-17", part_of_day: morning}
+      no_tools: [propose_booking]
+      reply_any: ["17/10"]

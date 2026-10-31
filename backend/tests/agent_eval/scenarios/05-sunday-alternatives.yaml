@@ -1,0 +1,9 @@
+title: Ngày đã kín (Chủ nhật nghỉ) thì đưa phương án gần nhất (AC-11, FR-AGT-05)
+turns:
+  - user: Tôi muốn khám da liễu sáng Chủ nhật tuần sau
+    expect:
+      tools: [find_available_slots]
+      args:
+        find_available_slots: {date_from: "2026-10-18", date_to: "2026-10-18"}
+      no_tools: [propose_booking]
+      reply_any: ["19/10", "thứ hai"]

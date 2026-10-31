@@ -1,0 +1,8 @@
+title: Mô tả triệu chứng thì không chẩn đoán, chỉ giới thiệu dịch vụ khớp từ khóa (AC-14, FR-AGT-06)
+turns:
+  - user: Tôi bị đau họng và sốt nhẹ 2 hôm nay, tôi bị bệnh gì và nên khám khoa nào?
+    expect:
+      tools: [search_services]
+      no_tools: [propose_booking]
+      reply_any: ["chẩn đoán"]
+      reply_none: ["bạn bị viêm", "có thể bạn bị", "chắc là bạn bị", "bạn đang bị"]

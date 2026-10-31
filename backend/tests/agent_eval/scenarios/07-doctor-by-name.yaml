@@ -1,0 +1,8 @@
+title: Tìm khung của đúng bác sĩ người dùng nêu tên (FR-SCH-04)
+turns:
+  - user: Tôi muốn khám da liễu với bác sĩ Thu Hà vào sáng thứ Hai tuần sau
+    expect:
+      tools: [find_available_slots]
+      args:
+        find_available_slots: {doctor_id: "@derm_ha", date_from: "2026-10-12", date_to: "2026-10-12"}
+      no_tools: [propose_booking]

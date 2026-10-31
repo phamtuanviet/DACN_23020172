@@ -1,0 +1,12 @@
+title: Đổi lịch sang giờ khác cùng ngày, giữ mã lịch (UC10)
+appointments:
+  - {key: lan_mon, patient: lan, doctor: derm_minh, service: derm, start: "2026-10-12T08:00:00+07:00"}
+turns:
+  - user: Đổi lịch khám da liễu thứ Hai tuần sau của tôi sang 9 giờ sáng cùng ngày, vẫn bác sĩ đó
+    expect:
+      tools: [get_my_appointments, find_available_slots]
+  - user: Đúng rồi, đổi sang 9 giờ giúp tôi
+    expect:
+      proposal: {type: RESCHEDULE, appointment_id: "@lan_mon", start_at: "2026-10-12T09:00:00+07:00"}
+  - confirm: true
+    expect_appointment: {id: "@lan_mon", start_at: "2026-10-12T09:00:00+07:00", status: BOOKED}

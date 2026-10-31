@@ -1,0 +1,11 @@
+title: Hủy lịch qua thẻ xác nhận (UC10, AC-12)
+appointments:
+  - {key: lan_mon, patient: lan, doctor: derm_minh, service: derm, start: "2026-10-12T08:00:00+07:00"}
+turns:
+  - user: Hủy giúp tôi lịch khám da liễu thứ Hai tuần sau, tôi phải đi công tác
+    expect:
+      tools: [get_my_appointments, propose_booking]
+      proposal: {type: CANCEL, appointment_id: "@lan_mon"}
+      reply_none: ["đã hủy lịch thành công", "hủy lịch thành công"]
+  - confirm: true
+    expect_appointment: {id: "@lan_mon", status: CANCELLED}

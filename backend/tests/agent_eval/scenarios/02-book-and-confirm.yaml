@@ -1,0 +1,13 @@
+title: Chọn khung rồi xác nhận trên thẻ, lịch giống hệt đặt trên web (AC-12)
+turns:
+  - user: Tôi muốn khám da liễu sáng thứ Bảy tuần sau
+    expect:
+      tools: [find_available_slots]
+  - user: Đặt khung 8 giờ giúp tôi, lý do là nổi mẩn đỏ ở tay
+    expect:
+      tools: [propose_booking]
+      proposal: {type: BOOK, service_id: "@derm", start_at: "2026-10-17T08:00:00+07:00"}
+      reply_any: ["17/10"]
+      reply_none: ["đã đặt lịch thành công", "đặt lịch thành công"]
+  - confirm: true
+    expect_appointment: {start_at: "2026-10-17T08:00:00+07:00", channel: AGENT, status: BOOKED}

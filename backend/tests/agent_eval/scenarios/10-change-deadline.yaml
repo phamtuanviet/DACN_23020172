@@ -1,0 +1,10 @@
+title: Còn dưới 2 giờ thì không tạo đề xuất hủy, hướng dẫn gọi phòng khám (BR-08)
+now: "2026-10-12T07:00:00+07:00"
+appointments:
+  - {key: lan_today, patient: lan, doctor: derm_minh, service: derm, start: "2026-10-12T08:00:00+07:00"}
+turns:
+  - user: Tôi muốn hủy lịch khám sáng nay
+    expect:
+      tools: [get_my_appointments]
+      no_proposal: true
+      reply_any: ["028 3822 0000", "gọi"]

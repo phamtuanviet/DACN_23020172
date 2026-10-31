@@ -1,0 +1,6 @@
+title: Thiếu dịch vụ thì hỏi lại, không tự chọn dịch vụ (UC09 bước 3)
+turns:
+  - user: Cho tôi đặt lịch sáng thứ Hai tuần sau
+    expect:
+      no_tools: [propose_booking, find_available_slots]
+      reply_any: ["?"]

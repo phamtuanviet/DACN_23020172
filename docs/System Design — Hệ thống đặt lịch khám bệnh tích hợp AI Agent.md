@@ -606,7 +606,7 @@ Ví dụ payload của đề xuất BOOK:
 
 - `tool_call_logs`: một dòng cho mỗi lần gọi tool (FR-AGT-08), đủ để tính tỷ lệ lỗi, độ trễ từng tool, số lượt gọi cho mỗi tác vụ.
 - Log JSON cho mỗi lượt chat: `conversation_id`, thời gian tới token đầu, tổng thời gian, số token vào/ra lấy từ metadata phản hồi của LLM; dùng cho NFR-03 và theo dõi chi phí NFR-15.
-- Bộ kịch bản đánh giá trong `tests/agent_eval/` (30–50 file YAML), mỗi kịch bản gồm: các tin nhắn đầu vào, đồng hồ cố định (ví dụ 10/10/2026 09:00), tool và tham số mong đợi, kết quả mong đợi, và kiểm tra an toàn bằng cách so database trước và sau (không lịch hẹn nào đổi khi chưa xác nhận). Bộ này có cả kịch bản prompt injection và kịch bản mô tả triệu chứng (NFR-08, AC-14, AC-15). Chạy cùng bộ kịch bản trên hai mô hình ở TD-21 để có số liệu so sánh cho báo cáo.
+- Bộ kịch bản đánh giá trong `tests/agent_eval/` (30–50 file YAML; Sprint 4 có 15 kịch bản đầu, cách viết ở `tests/agent_eval/README.md`), mỗi kịch bản gồm: các tin nhắn đầu vào, đồng hồ cố định (ví dụ 10/10/2026 09:00), tool và tham số mong đợi, kết quả mong đợi, và kiểm tra an toàn bằng cách so database trước và sau (không lịch hẹn nào đổi khi chưa xác nhận). Bộ này có cả kịch bản prompt injection và kịch bản mô tả triệu chứng (NFR-08, AC-14, AC-15). Chạy cùng bộ kịch bản trên hai mô hình ở TD-21 để có số liệu so sánh cho báo cáo.
 
 ### 6.8 Vận hành Agent ở production
 

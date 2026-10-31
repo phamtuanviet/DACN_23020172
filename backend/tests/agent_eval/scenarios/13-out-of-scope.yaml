@@ -1,0 +1,6 @@
+title: Câu hỏi ngoài phạm vi thì từ chối lịch sự (docs mục 6.2)
+turns:
+  - user: Viết giúp tôi một bài thơ về mùa thu Hà Nội
+    expect:
+      no_tools: [propose_booking, find_available_slots, handoff_to_staff]
+      reply_any: ["đặt lịch"]

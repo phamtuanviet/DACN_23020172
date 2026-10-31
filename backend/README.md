@@ -35,6 +35,7 @@ app/
 uv sync                                   # cài thư viện (kể cả nhóm dev)
 uv run pytest                             # unit + API test (bỏ qua integration, agent_eval)
 uv run pytest -m integration              # cần PostgreSQL: docker compose up -d db valkey
+uv run pytest -m agent_eval               # kịch bản Agent với LLM thật, tốn phí: tests/agent_eval/README.md
 uv run ruff check . && uv run mypy app    # lint, kiểm tra kiểu
 uv run alembic revision --autogenerate -m "mo ta"   # đọc lại file sinh ra trước khi commit
 uv run python -m app.cli --help
