@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from app.core.config import Environment, Settings
+from app.core.config import Environment, LlmProvider, Settings
 
 VALID_STAGING = {
     "app_env": Environment.STAGING,
@@ -69,3 +69,20 @@ def test_staging_rejects_empty_secret(field: str) -> None:
     settings = Settings(_env_file=None, **{**VALID_STAGING, field: ""})
     with pytest.raises(RuntimeError, match=f"thiếu {field}"):
         settings.validate_for_runtime()
+
+
+@pytest.mark.parametrize("env", [Environment.STAGING, Environment.PRODUCTION])
+def test_fake_llm_is_development_only(env: Environment) -> None:
+    """Mô hình giả theo luật chỉ cho e2e trên máy dev; staging, production từ chối khởi động."""
+    values = {**VALID_STAGING, "app_env": env, "sentry_dsn": "https://key@sentry.example/1"}
+    Settings(_env_file=None, **values).validate_for_runtime()
+    fake = Settings(_env_file=None, **values, llm_provider=LlmProvider.FAKE)
+    with pytest.raises(RuntimeError, match="llm_provider=fake"):
+        fake.validate_for_runtime()
+
+
+def test_llm_key_is_read_only_from_llm_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Không đọc OPENAI_API_KEY: khóa của nhà cung cấp này không được gửi sang nhà cung cấp khác
+    (compose ánh xạ OPENAI_API_KEY sang LLM_API_KEY cho máy dev)."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-khac")
+    assert Settings(_env_file=None).llm_api_key is None

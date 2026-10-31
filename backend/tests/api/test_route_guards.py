@@ -99,3 +99,29 @@ def test_appointment_route_rejects_wrong_role_with_403(
     response = client.request(method, path, json={})
     assert response.status_code == 403
     assert response.json()["code"] == "FORBIDDEN"
+
+
+AGENT_ROUTES = _routes("/api/v1/agent")
+
+
+def test_agent_routes_are_discovered() -> None:
+    assert len(AGENT_ROUTES) == 5  # trạng thái, chat, tải lại hội thoại, xác nhận, từ chối
+
+
+@pytest.mark.parametrize(("method", "path"), AGENT_ROUTES)
+def test_agent_route_without_token_returns_401(client: TestClient, method: str, path: str) -> None:
+    response = client.request(method, path, json={})
+    assert response.status_code == 401
+    assert response.json()["code"] == "UNAUTHENTICATED"
+
+
+@pytest.mark.parametrize(("method", "path"), AGENT_ROUTES)
+@pytest.mark.parametrize("user", [DOCTOR, ADMIN], ids=["doctor", "admin"])
+def test_agent_routes_are_for_patients_only(
+    client: TestClient, method: str, path: str, user: CurrentUser
+) -> None:
+    """Chỉ bệnh nhân dùng Agent (FR-AGT-01); quản trị cũng không xác nhận đề xuất hộ."""
+    client.app.dependency_overrides[get_current_user] = lambda: user  # type: ignore[attr-defined]
+    response = client.request(method, path, json={})
+    assert response.status_code == 403
+    assert response.json()["code"] == "FORBIDDEN"

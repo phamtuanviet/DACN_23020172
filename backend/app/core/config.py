@@ -27,6 +27,12 @@ class Environment(StrEnum):
     PRODUCTION = "production"
 
 
+class LlmProvider(StrEnum):
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    FAKE = "fake"  # mô hình giả theo luật, chỉ cho development và e2e (không gọi mạng)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -59,12 +65,16 @@ class Settings(BaseSettings):
     chat_retention_days: int = 365
 
     # --- LLM (TD-21, docs mục 6.8) ---
-    llm_provider: str = "anthropic"
-    llm_model: str = "claude-haiku-5-5"
-    llm_fallback_model: str | None = None
+    llm_provider: LlmProvider = LlmProvider.OPENAI
+    llm_model: str = "gpt-4o-mini"
+    llm_fallback_model: str | None = None  # cùng nhà cung cấp, đã qua bộ kịch bản đánh giá
     llm_api_key: SecretStr | None = None
     llm_timeout_s: int = 30
     llm_daily_budget_usd: float = 5.0
+    # Đơn giá để quy token ra tiền cho trần chi phí ngày; mặc định là giá niêm yết của
+    # gpt-4o-mini (USD cho 1 triệu token). Đổi mô hình thì đổi theo bảng giá của nhà cung cấp.
+    llm_input_usd_per_mtok: float = 0.15
+    llm_output_usd_per_mtok: float = 0.60
 
     # --- Email (TD-28) ---
     smtp_host: str = "localhost"
@@ -156,6 +166,8 @@ class Settings(BaseSettings):
             problems.append("smtp_starttls phải bật")
         if self.is_production and self.sentry_dsn is None:
             problems.append("thiếu sentry_dsn")
+        if self.llm_provider is LlmProvider.FAKE:
+            problems.append("llm_provider=fake chỉ dùng ở development")
         if problems:
             raise RuntimeError(f"Cấu hình {self.app_env} không hợp lệ: " + "; ".join(problems))
 

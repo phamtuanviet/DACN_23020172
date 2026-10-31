@@ -25,6 +25,7 @@ dependencies = [
   # AI Agent
   "langgraph>=0.2",
   "langchain-anthropic>=0.3",
+  "langchain-openai>=1.0",      # gpt-4o-mini (TD-21)
   # Quan sát
   "structlog>=24.1",
   "sentry-sdk[fastapi]>=2.0",

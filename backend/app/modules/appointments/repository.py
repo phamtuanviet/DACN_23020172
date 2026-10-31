@@ -65,6 +65,32 @@ async def lock_doctors_shared(session: AsyncSession, doctor_ids: Sequence[int]) 
     await session.execute(stmt)
 
 
+async def get_patient(session: AsyncSession, patient_id: int) -> User | None:
+    """Đọc không khóa, cho bước kiểm tra trước của đề xuất (Agent)."""
+    return await session.get(User, patient_id)
+
+
+async def patient_has_overlap(
+    session: AsyncSession,
+    patient_id: int,
+    start_at: datetime,
+    end_at: datetime,
+    *,
+    exclude_id: int | None = None,
+) -> bool:
+    """Bệnh nhân đã có lịch Đã đặt/Đã đến chồng khoảng này chưa — cùng điều kiện với
+    `excl_patient_overlap` (BR-09), để kiểm tra trước khi tạo đề xuất."""
+    stmt = select(Appointment.id).where(
+        Appointment.patient_id == patient_id,
+        Appointment.status.in_((AppointmentStatus.BOOKED, AppointmentStatus.ARRIVED)),
+        Appointment.start_at < end_at,
+        Appointment.end_at > start_at,
+    )
+    if exclude_id is not None:
+        stmt = stmt.where(Appointment.id != exclude_id)
+    return (await session.execute(stmt.limit(1))).first() is not None
+
+
 async def count_upcoming_booked(session: AsyncSession, patient_id: int, now: datetime) -> int:
     """Lịch BOOKED sắp tới của bệnh nhân (BR-09: tối đa 3)."""
     stmt = select(func.count()).where(

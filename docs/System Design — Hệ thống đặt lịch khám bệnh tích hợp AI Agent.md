@@ -1,10 +1,10 @@
 # System Design — Hệ thống đặt lịch khám bệnh tích hợp AI Agent
 
-Oct 10, 2026 · @Viet · Phiên bản 1.5
+Oct 10, 2026 · @Viet · Phiên bản 1.6
 
 Tài liệu này mô tả thiết kế hệ thống ở mức đủ để bắt tay viết code và đưa lên chạy thật (production): kiến trúc backend/frontend, database, API, các module, luồng dữ liệu, hạ tầng triển khai và các quyết định công nghệ kèm lý do. Căn cứ là PRD 0.1, SRS 1.0 và ERD (cùng ngày 10/10/2026); các mã BR, FR, NFR, AC, UC giữ nguyên như trong ba tài liệu đó.
 
-Bản 1.1 thay mọi lựa chọn chỉ phù hợp demo cục bộ ở bản 1.0 bằng lựa chọn vận hành được ở production; bản 1.2 chuyển frontend sang Next.js; bản 1.3 đồng bộ với khung project đã dựng; bản 1.4 bổ sung chi tiết của Scheduling Engine và API danh mục khi hiện thực Sprint 2; bản 1.5 bổ sung xem, đổi, hủy lịch và đổi trạng thái khi hiện thực Sprint 3. Lịch sử thay đổi ở mục 14.3.
+Bản 1.1 thay mọi lựa chọn chỉ phù hợp demo cục bộ ở bản 1.0 bằng lựa chọn vận hành được ở production; bản 1.2 chuyển frontend sang Next.js; bản 1.3 đồng bộ với khung project đã dựng; bản 1.4 bổ sung chi tiết của Scheduling Engine và API danh mục khi hiện thực Sprint 2; bản 1.5 bổ sung xem, đổi, hủy lịch và đổi trạng thái khi hiện thực Sprint 3; bản 1.6 hiện thực AI Agent (Sprint 4) với mô hình mặc định gpt-4o-mini. Lịch sử thay đổi ở mục 14.3.
 
 ## 1. Mục tiêu thiết kế
 
@@ -135,7 +135,7 @@ Mỗi quyết định có mã TD để tham chiếu. Tiêu chí chung: công ngh
 | Mã | Hạng mục | Lựa chọn | Đã cân nhắc | Lý do chọn |
 | --- | --- | --- | --- | --- |
 | TD-20 | Framework Agent | LangGraph | OpenAI Agents SDK; tự viết vòng lặp tool calling | Xem giải thích bên dưới |
-| TD-21 | Mô hình LLM | Cấu hình bằng biến môi trường. Phát triển dùng Claude Haiku 5.5 (`claude-haiku-5-5`); mô hình production chốt sau khi chạy bộ kịch bản trên cả Claude Sonnet 5.5 (`claude-sonnet-5-5`); có mô hình dự phòng đã qua đánh giá | Cố định một mô hình | Mô hình nhỏ rẻ và nhanh, hợp ngân sách và mục tiêu token đầu tiên < 5 s (NFR-03); mô hình lớn hơn dùng nếu mô hình nhỏ chưa đạt AC-15. Độ chính xác tool calling bằng tiếng Việt phải được đo, không mặc định là đạt. Vận hành ở production: mục 6.8 |
+| TD-21 | Mô hình LLM | Cấu hình bằng biến môi trường (`LLM_PROVIDER`, `LLM_MODEL`). Mặc định OpenAI gpt-4o-mini (chủ dự án chọn ở Sprint 4); vẫn hỗ trợ Anthropic. Mô hình production chốt sau khi chạy bộ kịch bản; có mô hình dự phòng cùng nhà cung cấp đã qua đánh giá | Cố định một mô hình | Mô hình nhỏ rẻ và nhanh, hợp ngân sách và mục tiêu token đầu tiên < 5 s (NFR-03); mô hình lớn hơn dùng nếu mô hình nhỏ chưa đạt AC-15. Độ chính xác tool calling bằng tiếng Việt phải được đo, không mặc định là đạt. Vận hành ở production: mục 6.8 |
 | TD-22 | Trạng thái hội thoại | Bảng `messages` của hệ thống; LangGraph chạy không trạng thái mỗi lượt | Checkpointer Postgres của LangGraph | Một nguồn sự thật cho lịch sử chat, giao diện và đánh giá; replica nào xử lý lượt chat cũng được; mỗi lượt chỉ nạp N tin nhắn gần nhất để giữ chi phí |
 | TD-23 | Truyền phản hồi | Server-Sent Events trên `POST /agent/chat` | WebSocket; polling | Dữ liệu một chiều server → client trong một request; chạy trên HTTP thường qua Cloudflare và Caddy, dùng chung header `Authorization`; không cần kết nối dính vào một replica như WebSocket |
 
@@ -256,11 +256,11 @@ Mũi tên nghĩa là "gọi hàm của". Quy tắc: không có vòng phụ thu�
 | Thành phần | Nội dung |
 | --- | --- |
 | `config.py` | `pydantic-settings` đọc biến môi trường và file secret trong `/run/secrets`; `APP_ENV` (development, staging, production) quyết định các mặc định an toàn: production tắt `/docs`, chặn seed, bắt buộc có đủ secret khi khởi động. Gom mọi tham số "đề xuất" của PRD (30 ngày, 2 giờ, 3 lịch, 10 phút, 50 tin nhắn, 24 giờ) để đổi không cần sửa code |
-| `db.py` | Async engine, pool mỗi tiến trình 4 + overflow 2, `pool_pre_ping`, kết nối TLS; tổng kết nối của mọi replica được tính để nằm dưới giới hạn của database managed (mục 11.2). Một `AsyncSession` mỗi request, helper `transaction()` |
+| `db.py` | Async engine, pool mỗi tiến trình 4 + overflow 2, `pool_pre_ping`, kết nối TLS; tổng kết nối của mọi replica được tính để nằm dưới giới hạn của database managed (mục 11.2). Một `AsyncSession` mỗi request. `transaction()` là ranh giới transaction của một thao tác service; bên trong `outer_transaction()` nó chạy trong SAVEPOINT, để xác nhận đề xuất của Agent khóa đề xuất, đặt lịch và đánh dấu đề xuất trong cùng một transaction (mục 6.4) |
 | `security.py` | Argon2id; tạo và kiểm tra JWT (PyJWT, HS256, có `kid` để xoay khóa); tạo, xoay vòng, thu hồi refresh token; dependency `current_user`, `require_roles(...)` |
 | `errors.py` | `AppError(code, message, status, details)`; handler chuyển mọi lỗi về dạng `{code, message, details}`; ánh xạ SQLSTATE `23P01` theo tên constraint |
 | `clock.py` | `Clock.now()` trả `datetime` có múi giờ; dependency `get_clock` được thay bằng đồng hồ cố định trong test |
-| `logging.py` | structlog JSON; middleware nhận hoặc sinh `X-Request-ID`, ghi một dòng log mỗi request (method, path, status, latency, user_id); lọc bỏ mật khẩu, token, nội dung chat khỏi log |
+| `logging.py` | structlog JSON; middleware nhận hoặc sinh `X-Request-ID`, ghi một dòng log mỗi request (method, path, status, latency, user_id); lọc bỏ mật khẩu, token, nội dung chat khỏi log: code không log các trường này, và processor `redact_sensitive` che giá trị của các khóa như `email`, `phone`, `reason`, `content` khi có người lỡ truyền vào |
 | `ratelimit.py` | `slowapi` với kho Valkey: đăng nhập theo IP, API chung theo người dùng. IP thật lấy từ `X-Forwarded-For` do Caddy đặt; Caddy chỉ tin IP của Cloudflare (mục 11.3) |
 | `observability.py` | Khởi tạo Sentry SDK (gắn phiên bản phát hành, không gửi dữ liệu cá nhân); expose `/metrics` cho Prometheus; metric nghiệp vụ: số lịch đặt theo kênh, số lần `SLOT_TAKEN`, độ trễ `/availability`, số lượt chat, token LLM, tuổi email chờ gửi lâu nhất |
 | `timeutil.py` | Múi giờ phòng khám `ZoneInfo("Asia/Ho_Chi_Minh")`; chuyển ngày giờ địa phương ↔ `timestamptz` |
@@ -317,12 +317,13 @@ Mọi lỗi trả cùng một dạng, đúng SRS 7.2:
 | 409 | `MAX_ACTIVE_APPOINTMENTS` | Đã có 3 lịch BOOKED sắp tới (BR-09) |
 | 409 | `CHANGE_DEADLINE_PASSED` | Còn dưới 2 giờ trước giờ khám; `details.clinic_phone` để liên hệ (BR-08) |
 | 409 | `INVALID_TRANSITION` | Chuyển trạng thái không có trong sơ đồ (FR-APT-06), đổi/hủy lịch không còn ở trạng thái Đã đặt, hoặc cập nhật buổi khám sai thời điểm (mục 5.5); `details.status` là trạng thái hiện tại |
-| 409 | `PROPOSAL_EXPIRED`, `PROPOSAL_NOT_PENDING` | Đề xuất quá 10 phút, hoặc đã bị từ chối/thay thế (BR-06) |
+| 409 | `PROPOSAL_EXPIRED`, `PROPOSAL_NOT_PENDING` | Đề xuất quá 10 phút hoặc đã bị thay thế; đã xác nhận, từ chối hay thất bại trước đó (BR-06). Lỗi của endpoint confirm luôn kèm `details.proposal_status` |
 | 409 | `SHIFT_OVERLAP`, `EMAIL_TAKEN`, `ALREADY_REVIEWED` | Ca chồng ca; email đã tồn tại; lịch đã được đánh giá |
 | 422 | `VALIDATION_ERROR` | Sai định dạng dữ liệu; `details.fields` liệt kê lỗi từng trường |
 | 429 | `RATE_LIMITED`, `ACCOUNT_LOCKED`, `AGENT_QUOTA_EXCEEDED` | Vượt giới hạn tốc độ (mục 4.6), ví dụ quá 10 lần đăng nhập/phút/IP hoặc quá 10 lần đặt, đổi, hủy lịch/phút/người dùng; tài khoản bị khóa 15 phút; quá 50 tin nhắn Agent/ngày |
 | 500 | `INTERNAL_ERROR` | Lỗi không lường trước; chỉ trả `request_id`, stack trace nằm trong log và Sentry (NFR-14) |
-| 503 | `AGENT_UNAVAILABLE` | LLM lỗi liên tục (đang ngắt mạch) hoặc đã chạm trần chi phí trong ngày (mục 6.8); trang đặt lịch thông thường vẫn hoạt động |
+| 503 | `AGENT_UNAVAILABLE` | Chưa cấu hình khóa API, LLM lỗi liên tục (đang ngắt mạch) hoặc đã chạm trần chi phí trong ngày (mục 6.8); trang đặt lịch thông thường vẫn hoạt động. Lỗi LLM giữa chừng một lượt chat báo qua sự kiện SSE `error` cùng mã này |
+| — | `AGENT_TIMEOUT` | Chỉ có trong sự kiện SSE `error`: lượt chat quá 30 giây hoặc quá 10 bước của đồ thị (mục 6.1) |
 
 Mã lỗi là hợp đồng chung của backend, frontend và Agent: frontend ánh xạ `code` sang thông báo tiếng Việt và hành động (ví dụ `SLOT_TAKEN` → tải lại khung trống), còn tool của Agent trả `code` về cho LLM để nó giải thích và đưa phương án khác.
 
@@ -508,6 +509,8 @@ Vòng đời một lượt `POST /agent/chat`:
 7. Lưu tin nhắn ASSISTANT và các dòng TOOL, cập nhật `conversations.last_message_at`, gửi sự kiện `done`.
 8. Quá 30 giây hoặc LLM lỗi: gửi sự kiện `error` kèm thông báo ngắn và gợi ý dùng trang đặt lịch thông thường (ngoại lệ của UC09).
 
+Bước 1–3 chạy trong dependency của FastAPI, trước khi mở luồng SSE, nên lỗi trả đúng mã HTTP: 403 hội thoại của người khác, 404 hội thoại không còn, 429 hết hạn mức, 503 trợ lý tạm ngưng. Đếm hạn mức giữ advisory lock theo bệnh nhân, để hai lượt đồng thời không cùng đếm thấy 49 rồi cùng vượt 50. Thời hạn 30 giây chỉ bọc lần chờ sự kiện kế tiếp của đồ thị, không bọc lệnh `yield` của luồng SSE: hủy theo thời hạn mà trúng lúc generator đang dừng ở `yield` sẽ hủy nhầm task phát SSE của FastAPI. Mỗi dòng TOOL được ghi ngay khi tool chạy xong (cùng `tool_call_logs`, tham số đã bỏ ký tự NUL mà jsonb không nhận), câu trả lời ASSISTANT ghi cuối lượt; chữ trước và sau một lần gọi tool nối bằng một dòng trống. Phần cuối lượt (cộng chi phí, cập nhật ngắt mạch, lưu câu trả lời) chạy trong `finally` được che khỏi lệnh hủy, nên vẫn chạy khi trình duyệt ngắt kết nối giữa chừng. Một câu trả lời của LLM gọi quá 3 tool thì phần thừa nhận lỗi mà không chạy.
+
 ### 6.2 Prompt hệ thống
 
 Prompt gồm phần tĩnh đặt trước (để tận dụng prompt caching nếu nhà cung cấp hỗ trợ) và phần động đặt sau cùng.
@@ -536,7 +539,11 @@ Bảng 14 ngày giúp mô hình đổi "thứ Bảy tuần sau" thành 17/10/202
 - Không tool nào nhận `patient_id`. Mọi tool đi qua decorator `@agent_tool`: kiểm tra tham số bằng Pydantic; lấy `AgentContext(patient_id, conversation_id, now)` từ `config["configurable"]` của LangGraph (phần này không nằm trong schema mà LLM nhìn thấy); đo thời gian; bắt `AppError` và trả `{error: code, message}`; ghi một dòng `tool_call_logs` gồm args, result, success, latency_ms (FR-AGT-08).
 - `part_of_day` được backend đổi thành khoảng giờ cấu hình được (sáng 07:00–12:00 như UC09, chiều 12:00–17:00, tối 17:00–21:00). LLM chỉ chọn nhãn, không tự đặt giờ; ngày truyền vào dạng `YYYY-MM-DD` — đúng biện pháp "công cụ nhận ngày dạng chuẩn" của PRD mục 10.
 - Kết quả có sẵn nhãn tiếng Việt và giờ địa phương để LLM chép lại, không phải tự đổi múi giờ.
-- `propose_booking` kiểm tra trước như khi ghi thật (khung còn trống, BR-07, BR-08, BR-09, lịch thuộc bệnh nhân) để không hiện thẻ chắc chắn thất bại; không đạt thì trả mã lỗi cho LLM thay vì tạo đề xuất. Tạo đề xuất xong, tool phát sự kiện `proposal` để frontend vẽ thẻ xác nhận.
+- `propose_booking` kiểm tra trước như khi ghi thật (khung còn trống, BR-07, BR-08, BR-09, lịch thuộc bệnh nhân) để không hiện thẻ chắc chắn thất bại; không đạt thì trả mã lỗi cho LLM thay vì tạo đề xuất. Tạo đề xuất xong, tool phát sự kiện `proposal` để frontend vẽ thẻ xác nhận. Phần kiểm tra trước nằm ở `AppointmentService.preview_book`, `preview_reschedule`, `preview_cancel`: đọc không khóa, không ghi, cùng quy tắc với thao tác ghi.
+- `search_services` nhận nhiều từ khóa ngăn cách bằng dấu phẩy ("đau họng, sốt"): mỗi từ khóa tìm riêng rồi gộp, tối đa 5 dịch vụ. Vẫn chỉ khớp từ khóa, không suy luận chuyên khoa.
+- `find_available_slots` trả mỗi giờ bắt đầu một bác sĩ (bác sĩ đã chọn, không thì người ít lịch nhất trong ngày). Khoảng được hỏi đã kín thì kèm `nearest_dates` (tối đa 3 ngày, có nhãn) và `alternatives` (tối đa 3 khung): 2 khung đầu của ngày gần nhất còn khung đúng buổi, khung gần nhất ở buổi khác trong ngày được hỏi, và khung của bác sĩ khác khi người dùng đã chọn bác sĩ (UC09 4a).
+- Mô tả tool gửi cho LLM là docstring của hàm tool; schema tham số sinh từ model Pydantic. Mỗi câu trả lời của LLM gọi tối đa một tool (`parallel_tool_calls = false`, cả OpenAI lẫn Anthropic) để không có hai đề xuất song song.
+- Mỗi tool có nhãn trạng thái tính từ tham số và kết quả, ví dụ "Đã tìm khung trống sáng Thứ Bảy 17/10"; cùng hàm này dựng nhãn khi tải lại hội thoại, nên giao diện trước và sau khi tải lại giống nhau.
 
 ### 6.4 Đề xuất và xác nhận
 
@@ -557,7 +564,9 @@ stateDiagram-v2
 - **Dùng một lần, có hạn.** Khóa dòng đề xuất `FOR UPDATE`; chỉ thực thi khi `status = PENDING` và `expires_at > now` (BR-06). Hạn được kiểm tra ngay tại endpoint, không phụ thuộc worker. Gọi lại confirm cho đề xuất đã CONFIRMED trả kết quả cũ mà không ghi thêm (chống bấm đúp).
 - **Mỗi hội thoại chỉ một đề xuất đang chờ.** Đề xuất mới chuyển đề xuất PENDING cũ sang EXPIRED, nên bệnh nhân không thể xác nhận nhầm thẻ cũ sau khi Agent đã đổi phương án.
 - **Thực thi bằng đúng service của web.** Payload `jsonb` do backend dựng (không phải văn bản LLM viết) được đưa vào `AppointmentService.book`, `reschedule` hoặc `cancel` với Actor kênh `AGENT`; mọi kiểm tra ở mục 5.4 chạy lại từ đầu. Vì vậy kết quả trên web giống hệt khi thao tác bằng giao diện (AC-12).
-- **Kết quả quay về hội thoại.** Thành công: backend gán `appointment_id` (với BOOK) và ghi một tin nhắn ASSISTANT "Đã đặt lịch LH-261010-7KQ2 …" vào hội thoại — đúng bước 9 của UC09 mà không tốn thêm lượt gọi LLM. Thất bại vì `SLOT_TAKEN`: đề xuất chuyển FAILED, response kèm `alternatives`; frontend tự gửi một lượt chat ẩn với `trigger = proposal_failed` để Agent tìm khung mới (UC09 ngoại lệ 8a).
+- **Kết quả quay về hội thoại.** Thành công: backend gán `appointment_id` (với BOOK) và ghi một tin nhắn ASSISTANT "Đã đặt lịch LH-261010-7KQ2 …" vào hội thoại — đúng bước 9 của UC09 mà không tốn thêm lượt gọi LLM. Thất bại vì `SLOT_TAKEN`: đề xuất chuyển FAILED, response kèm `alternatives`; frontend tự gửi một lượt chat ẩn với `trigger = proposal_failed` để Agent tìm khung mới (UC09 ngoại lệ 8a). Bấm Hủy trên thẻ cũng ghi một tin ASSISTANT "Bạn đã bỏ qua đề xuất…" để lượt sau LLM biết.
+- **Một transaction cho cả xác nhận.** `outer_transaction` khóa đề xuất `FOR UPDATE`, rồi `AppointmentService.book`, `reschedule` hoặc `cancel` chạy trong SAVEPOINT của transaction đó (`transaction()` ở mục 4.5), rồi đề xuất chuyển CONFIRMED cùng commit. Service từ chối thì chỉ SAVEPOINT bị rollback: đề xuất vẫn được ghi FAILED kèm lý do, lỗi trả về giữ nguyên mã của web và có `details.proposal_status`. Thứ tự khóa đề xuất → bệnh nhân → bác sĩ → lịch hẹn không ngược với luồng nào khác, nên không deadlock.
+- **Thẻ mang kết quả.** `payload.result` của đề xuất giữ mã lịch, lý do thất bại và id tin ASSISTANT vừa ghi. Khi tải lại hội thoại, tin đó không hiện thành bong bóng riêng vì thẻ đã hiện kết quả; tin vẫn nằm trong `messages` để LLM đọc ở lượt sau.
 
 Ví dụ payload của đề xuất BOOK:
 
@@ -601,11 +610,11 @@ Ví dụ payload của đề xuất BOOK:
 
 ### 6.8 Vận hành Agent ở production
 
-- **Trần chi phí toàn hệ thống.** Sau mỗi lượt chat, số token vào/ra (lấy từ metadata phản hồi) được quy ra tiền theo đơn giá cấu hình và cộng vào bộ đếm theo ngày trên Valkey. Chạm trần `LLM_DAILY_BUDGET_USD` thì `/agent/chat` trả 503 `AGENT_UNAVAILABLE` và khung chat dẫn sang trang đặt lịch thông thường; đạt 80% trần thì gửi cảnh báo (mục 11.7).
-- **Ngắt mạch khi nhà cung cấp lỗi.** Quá 5 lỗi liên tiếp trong 1 phút thì ngừng gọi LLM trong 2 phút (circuit breaker). Trạng thái ngắt mạch lưu ở Valkey để mọi replica cùng biết, tránh dồn request và chi phí thử lại vào một nhà cung cấp đang sự cố.
-- **Mô hình dự phòng.** `LLM_FALLBACK_MODEL` (tùy chọn) được dùng khi mô hình chính lỗi; chỉ bật sau khi mô hình đó đã qua bộ kịch bản đánh giá. Chọn mô hình của nhà cung cấp khác nếu muốn chống sự cố toàn nhà cung cấp — LangGraph cho phép điều này mà không đổi code (TD-20).
+- **Trần chi phí toàn hệ thống.** Sau mỗi lượt chat, số token vào/ra (lấy từ metadata phản hồi) được quy ra tiền theo đơn giá cấu hình (`LLM_INPUT_USD_PER_MTOK`, `LLM_OUTPUT_USD_PER_MTOK`; mặc định là giá niêm yết của gpt-4o-mini, 0,15 và 0,60 USD cho 1 triệu token) và cộng vào bộ đếm theo ngày trên Valkey. Lần gọi bị hủy khi nhà cung cấp chưa báo số token (ngắt kết nối, quá 30 giây) được tính theo ước lượng độ dài prompt, vì nhà cung cấp vẫn tính tiền phần đã đọc. Chạm trần `LLM_DAILY_BUDGET_USD` thì `/agent/chat` trả 503 `AGENT_UNAVAILABLE` và khung chat dẫn sang trang đặt lịch thông thường; đạt 80% trần thì gửi cảnh báo (mục 11.7).
+- **Ngắt mạch khi nhà cung cấp lỗi.** Quá 5 lỗi liên tiếp trong 1 phút thì ngừng gọi LLM trong 2 phút (circuit breaker). Chỉ lỗi của nhà cung cấp (lỗi mạng, 429, 5xx, quá hạn khi đang chờ trả lời) được đếm; lỗi của chính hệ thống không khóa kênh chat của mọi người. Trạng thái ngắt mạch lưu ở Valkey để mọi replica cùng biết, tránh dồn request và chi phí thử lại vào một nhà cung cấp đang sự cố.
+- **Mô hình dự phòng.** `LLM_FALLBACK_MODEL` (tùy chọn) được dùng khi mô hình chính lỗi trước khi trả chữ đầu tiên; chỉ bật sau khi mô hình đó đã qua bộ kịch bản đánh giá. Hiện mô hình dự phòng cùng nhà cung cấp với mô hình chính (một khóa API); dự phòng khác nhà cung cấp cần thêm cấu hình khóa thứ hai — LangGraph cho phép điều này mà không đổi luồng (TD-20).
 - **Giảm cấp an toàn.** Web không phụ thuộc Agent (mục 4.4): mọi sự cố LLM chỉ làm mất kênh chat, đặt lịch trên web vẫn chạy bình thường.
-- **Tối thiểu hóa dữ liệu gửi đi.** Phần hệ thống tự thêm vào prompt và kết quả tool không chứa email, số điện thoại, ngày sinh của bệnh nhân. Dùng gói API mà nhà cung cấp cam kết không dùng dữ liệu để huấn luyện, và ghi việc chuyển dữ liệu ra nước ngoài vào hồ sơ bảo vệ dữ liệu (mục 11.8).
+- **Tối thiểu hóa dữ liệu gửi đi.** Phần hệ thống tự thêm vào prompt và kết quả tool không chứa email, số điện thoại, ngày sinh của bệnh nhân. Integration OpenAI, LangChain, Anthropic của Sentry đặt `include_prompts=False`: Sentry chỉ nhận thời gian và số token, không nhận nội dung chat, kể cả khi sau này bật `send_default_pii`. Log mỗi lượt chat chỉ ghi id hội thoại, thời gian, số token, tên tool (tên lạ do LLM bịa ghi là `unknown`); lỗi của nhà cung cấp LLM chỉ ghi tên loại lỗi. Tracing của LangSmith gửi toàn bộ hội thoại ra ngoài nên luôn tắt (`LANGSMITH_TRACING=false` trong cấu hình mọi môi trường). Dùng gói API mà nhà cung cấp cam kết không dùng dữ liệu để huấn luyện, và ghi việc chuyển dữ liệu ra nước ngoài vào hồ sơ bảo vệ dữ liệu (mục 11.8).
 - **Đổi prompt có kiểm soát.** Prompt nằm trong mã nguồn và có số phiên bản; mỗi thay đổi prompt hoặc mô hình phải chạy lại bộ kịch bản trên staging trước khi lên production. Log mỗi lượt chat ghi kèm phiên bản prompt và tên mô hình để so sánh trước/sau.
 
 ## 7. Thiết kế database
@@ -770,6 +779,7 @@ Mọi endpoint `/admin/*` yêu cầu vai trò ADMIN. Quản trị đổi, hủy 
 
 | Endpoint | Vai trò | Mô tả | Yêu cầu |
 | --- | --- | --- | --- |
+| `GET /agent/status` (mới) | Bệnh nhân | Trợ lý có đang nhận tin không, số tin nhắn còn lại hôm nay | FR-AGT-09 |
 | `POST /agent/chat` | Bệnh nhân | Gửi tin nhắn, nhận phản hồi dạng SSE | FR-AGT-01..09 |
 | `GET /agent/conversations/{id}/messages` (mới) | Chủ hội thoại | Tải lại tin nhắn và thẻ đề xuất khi mở lại trang | FR-AGT-01 |
 | `POST /agent/proposals/{id}/confirm` | Chủ đề xuất | Thực thi đề xuất | FR-AGT-04 |
@@ -886,11 +896,13 @@ data: {"assistant_message_id": 1034, "remaining_quota": 47}
 | `meta` | Mở đầu luồng; trả `conversation_id` (tạo mới nếu chưa có) | Lưu vào `sessionStorage` |
 | `token` | Một đoạn văn bản trả lời | Nối vào bong bóng chat đang hiển thị |
 | `tool` | Tool bắt đầu hoặc kết thúc; chỉ có tên và nhãn, không có tham số | Hiện dòng trạng thái "Đang tìm khung giờ trống…" |
+| `services` | Dịch vụ `search_services` tìm được | Vẽ thẻ dịch vụ có nút "Tìm giờ khám" (chỉ khi lượt không có khung giờ) |
+| `slots` | Khung giờ `find_available_slots` tìm được (hoặc khung thay thế khi đã kín) | Vẽ nút chọn khung trong bong bóng trả lời |
 | `proposal` | Đề xuất vừa được tạo | Vẽ thẻ xác nhận có đồng hồ đếm ngược |
 | `done` | Kết thúc lượt; số tin nhắn còn lại trong ngày | Mở lại ô nhập |
 | `error` | `{code, message}`: quá thời gian, LLM lỗi, hết hạn mức | Hiện thông báo, gợi ý trang đặt lịch thông thường |
 
-Server gửi dòng chú thích `: ping` mỗi 15 giây để Cloudflare và trình duyệt không cắt kết nối khi LLM đang xử lý lâu; Caddy tự flush luồng `text/event-stream` nên token tới người dùng ngay (mục 11.3).
+Server gửi dòng chú thích `: ping` mỗi 15 giây để Cloudflare và trình duyệt không cắt kết nối khi LLM đang xử lý lâu (FastAPI `EventSourceResponse` tự chèn khi luồng im lặng); Caddy tự flush luồng `text/event-stream` nên token tới người dùng ngay (mục 11.3). Lỗi trước khi mở luồng (hết hạn mức, tạm ngưng, hội thoại của người khác) trả JSON lỗi với mã HTTP như mọi endpoint; sự kiện `error` chỉ dùng cho lỗi giữa chừng, mã `AGENT_TIMEOUT` hoặc `AGENT_UNAVAILABLE`, và luôn có `done` theo sau.
 
 ## 9. Thiết kế frontend
 
@@ -1553,7 +1565,7 @@ Mỗi tiêu chí nghiệm thu P0 có ít nhất một test tự động; test ba
 
 - Mọi test liên quan thời gian dùng đồng hồ cố định qua dependency `get_clock`.
 - Test integration chạy trong transaction riêng và rollback khi kết thúc; riêng test đồng thời dùng database tạo mới, vì nhiều kết nối không thể chia chung một transaction.
-- Test Agent hằng ngày dùng LLM giả trả về tool call dựng sẵn, kiểm tra đường ống tool, SSE và đề xuất mà không tốn chi phí; bộ kịch bản với LLM thật chỉ chạy khi đổi prompt, đổi mô hình hoặc trước mốc đánh giá (biện pháp "cache kịch bản test" ở PRD mục 10).
+- Test Agent hằng ngày dùng LLM giả trả về tool call dựng sẵn (`ScriptedModel` trong `tests/integration/agent_support.py`), kiểm tra đường ống tool, SSE và đề xuất mà không tốn chi phí; e2e của khung chat chạy với mô hình giả theo luật (`LLM_PROVIDER=fake`, `E2E_FAKE_LLM=1`). Bộ kịch bản với LLM thật chỉ chạy khi đổi prompt, đổi mô hình hoặc trước mốc đánh giá (biện pháp "cache kịch bản test" ở PRD mục 10).
 - Độ phủ ≥ 70% cho module `scheduling` và `appointments` (NFR-12), đo bằng `pytest-cov` trên CI.
 
 ```text
@@ -1661,3 +1673,5 @@ Các điểm sau là quyết định ở mức thiết kế. SRS mục 2.2, 2.3 
 **Bản 1.4 (so với 1.3):** bổ sung khi hiện thực Sprint 2, không đổi schema. Thêm `GET /availability/earliest` và trường `status` của từng ngày trong `/availability` (mục 5.2, 8.2, 8.3); `ensure_slot_bookable` phân biệt `SLOT_TAKEN` với `SLOT_NOT_OFFERED` (mục 5.3); INSERT lịch hẹn chạy trong SAVEPOINT để thử bác sĩ kế tiếp và sinh lại mã (mục 5.4); seed có lịch hẹn mẫu đặt qua `AppointmentService` (mục 7.5).
 
 **Bản 1.5 (so với 1.4):** bổ sung khi hiện thực Sprint 3, không đổi schema. Thêm `GET /appointments/me` có phân trang, `GET /appointments/{id}` kèm lịch sử thay đổi, đổi lịch, hủy lịch, đổi trạng thái buổi khám (mục 8.2, 8.3); `AppointmentOut` thêm `change_until`. Đổi lịch khóa bác sĩ trước lịch hẹn và chấp nhận khung trên lưới mà `/availability` hiển thị (mục 5.3, 5.4); giới hạn thời điểm khi cập nhật buổi khám (mục 5.5); gắn cờ kiểm tra lại dưới khóa (mục 5.7); giới hạn 10 lần đặt, đổi, hủy mỗi phút cho mỗi người dùng (mục 4.6, 4.7); bác sĩ không thấy lý do hủy (mục 4.6); seed mô phỏng lịch 2 tuần trước theo dòng thời gian (mục 7.5); frontend thêm `shared/appointments`, trang `/booking/done` và query key của lịch hẹn (mục 9.2–9.4).
+
+**Bản 1.6 (so với 1.5):** hiện thực AI Agent ở Sprint 4, không đổi schema. Mô hình mặc định đổi sang OpenAI gpt-4o-mini, vẫn hỗ trợ Anthropic, thêm mô hình giả theo luật cho e2e (TD-21, mục 11.6). Thêm `GET /agent/status` (mục 8.2); sự kiện SSE `services`, `slots` và mã `AGENT_TIMEOUT` (mục 4.7, 8.4); confirm chạy trong `outer_transaction` với SAVEPOINT, lỗi kèm `details.proposal_status` (mục 4.5, 4.7, 6.4); chi tiết vòng đời lượt chat, tìm từ khóa nhiều cụm, cách chọn khung thay thế, nhãn trạng thái tool (mục 6.1, 6.3); đơn giá token cấu hình được (mục 6.8); khung chat trên frontend (mục 9.2, 9.5).

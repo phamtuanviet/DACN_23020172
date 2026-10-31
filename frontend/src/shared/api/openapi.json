@@ -1936,6 +1936,239 @@
           }
         }
       }
+    },
+    "/api/v1/agent/status": {
+      "get": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Agent Status",
+        "operationId": "agent_status_api_v1_agent_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agent/chat": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Chat",
+        "description": "Gửi tin nhắn, nhận phản hồi dạng SSE: meta, token, tool, services, slots, proposal, error,\ndone (docs mục 8.4). 429 AGENT_QUOTA_EXCEEDED khi hết 50 tin nhắn trong ngày, 503\nAGENT_UNAVAILABLE khi trợ lý tạm ngưng.",
+        "operationId": "chat_api_v1_agent_chat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agent/conversations/{conversation_id}/messages": {
+      "get": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Conversation Messages",
+        "operationId": "conversation_messages_api_v1_agent_conversations__conversation_id__messages_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/proposals/{proposal_id}/confirm": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Confirm Proposal",
+        "description": "Bệnh nhân bấm Xác nhận trên thẻ. Thất bại thì trả nguyên mã lỗi của web (SLOT_TAKEN kèm\nkhung thay thế, CHANGE_DEADLINE_PASSED…) với `details.proposal_status`.",
+        "operationId": "confirm_proposal_api_v1_agent_proposals__proposal_id__confirm_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "proposal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Proposal Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/proposals/{proposal_id}/reject": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Reject Proposal",
+        "operationId": "reject_proposal_api_v1_agent_proposals__proposal_id__reject_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "proposal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Proposal Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1985,6 +2218,30 @@
         ],
         "title": "AffectedOut",
         "description": "Lịch BOOKED sắp tới bị ảnh hưởng: nằm trong ngày nghỉ hoặc không còn nằm trong ca nào."
+      },
+      "AgentStatus": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "Trợ lý đang nhận tin nhắn (có mô hình, chưa ngắt mạch)"
+          },
+          "daily_limit": {
+            "type": "integer",
+            "title": "Daily Limit"
+          },
+          "remaining_quota": {
+            "type": "integer",
+            "title": "Remaining Quota"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "daily_limit",
+          "remaining_quota"
+        ],
+        "title": "AgentStatus"
       },
       "AppointmentDetail": {
         "properties": {
@@ -2349,6 +2606,185 @@
           "SYSTEM"
         ],
         "title": "Channel"
+      },
+      "ChatItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant",
+              "tool"
+            ],
+            "title": "Kind"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "hidden": {
+            "type": "boolean",
+            "title": "Hidden",
+            "description": "Lượt tự gửi sau đề xuất thất bại",
+            "default": false
+          },
+          "tool": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "services": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ServiceOption"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Services"
+          },
+          "slots": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SlotOption"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slots"
+          },
+          "proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposalOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "created_at"
+        ],
+        "title": "ChatItem",
+        "description": "Một dòng trong khung chat khi tải lại hội thoại (docs mục 9.5)."
+      },
+      "ChatRequest": {
+        "properties": {
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id",
+            "description": "Bỏ trống ở tin nhắn đầu tiên: backend tạo hội thoại mới"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Message"
+          },
+          "trigger": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "proposal_failed"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger",
+            "description": "Lượt giao diện tự gửi sau khi xác nhận đề xuất thất bại vì khung vừa bị đặt (docs mục 6.4); backend thay nội dung tin nhắn bằng câu dựng sẵn"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ChatRequest"
+      },
+      "ConfirmOut": {
+        "properties": {
+          "proposal": {
+            "$ref": "#/components/schemas/ProposalOut"
+          },
+          "appointment": {
+            "$ref": "#/components/schemas/AppointmentOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "proposal",
+          "appointment"
+        ],
+        "title": "ConfirmOut",
+        "description": "Kết quả xác nhận: cùng cấu trúc lịch hẹn của web, kèm trạng thái đề xuất (docs mục 6.4)."
+      },
+      "ConversationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChatItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "remaining_quota": {
+            "type": "integer",
+            "title": "Remaining Quota"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "items",
+          "remaining_quota"
+        ],
+        "title": "ConversationOut"
       },
       "DayOut": {
         "properties": {
@@ -2822,6 +3258,166 @@
         "title": "PatientBrief",
         "description": "Bác sĩ chỉ thấy họ tên và tuổi, không thấy email, số điện thoại (docs mục 4.6)."
       },
+      "ProposalDisplay": {
+        "properties": {
+          "service": {
+            "type": "string",
+            "title": "Service"
+          },
+          "doctor": {
+            "type": "string",
+            "title": "Doctor"
+          },
+          "when": {
+            "type": "string",
+            "title": "When",
+            "description": "Ví dụ “Thứ Bảy, 17/10/2026 · 08:00–08:20”"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code",
+            "description": "Mã lịch đang đổi hoặc hủy"
+          },
+          "old_when": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old When",
+            "description": "Đổi lịch: giờ cũ"
+          },
+          "old_doctor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Doctor",
+            "description": "Đổi lịch sang bác sĩ khác"
+          }
+        },
+        "type": "object",
+        "required": [
+          "service",
+          "doctor",
+          "when"
+        ],
+        "title": "ProposalDisplay",
+        "description": "Chữ trên thẻ xác nhận, do backend dựng từ dữ liệu đã kiểm tra (không phải chữ của LLM)."
+      },
+      "ProposalOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ProposalType"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProposalStatus"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "display": {
+            "$ref": "#/components/schemas/ProposalDisplay"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "appointment_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Code",
+            "description": "Mã lịch sau khi xác nhận"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Lý do khi status = FAILED"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "status",
+          "expires_at",
+          "display",
+          "appointment_id"
+        ],
+        "title": "ProposalOut"
+      },
+      "ProposalStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "CONFIRMED",
+          "REJECTED",
+          "EXPIRED",
+          "FAILED"
+        ],
+        "title": "ProposalStatus"
+      },
+      "ProposalType": {
+        "type": "string",
+        "enum": [
+          "BOOK",
+          "RESCHEDULE",
+          "CANCEL"
+        ],
+        "title": "ProposalType"
+      },
       "RegisterRequest": {
         "properties": {
           "full_name": {
@@ -3024,6 +3620,45 @@
           "ref_price_vnd"
         ],
         "title": "ServiceCreate"
+      },
+      "ServiceOption": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "specialty": {
+            "type": "string",
+            "title": "Specialty"
+          },
+          "duration_min": {
+            "type": "integer",
+            "title": "Duration Min"
+          },
+          "ref_price_vnd": {
+            "type": "integer",
+            "title": "Ref Price Vnd"
+          },
+          "scope_description": {
+            "type": "string",
+            "title": "Scope Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "specialty",
+          "duration_min",
+          "ref_price_vnd",
+          "scope_description"
+        ],
+        "title": "ServiceOption",
+        "description": "Dịch vụ khớp từ khóa, hiện thành thẻ có nút \"Tìm giờ khám\"."
       },
       "ServiceOut": {
         "properties": {
@@ -3386,6 +4021,43 @@
         "type": "object",
         "title": "ShiftUpdate",
         "description": "Chỉ trường được gửi mới đổi; sau khi gộp với ca hiện tại được kiểm lại như ShiftIn."
+      },
+      "SlotOption": {
+        "properties": {
+          "doctor_id": {
+            "type": "integer",
+            "title": "Doctor Id"
+          },
+          "doctor_name": {
+            "type": "string",
+            "title": "Doctor Name"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Nhãn có sẵn để đọc lại, ví dụ “Thứ Bảy 17/10, 08:00–08:20”"
+          }
+        },
+        "type": "object",
+        "required": [
+          "doctor_id",
+          "doctor_name",
+          "start_at",
+          "end_at",
+          "label"
+        ],
+        "title": "SlotOption",
+        "description": "Một khung cụ thể với một bác sĩ, để Agent trình bày và tạo đề xuất (docs mục 6.3)."
       },
       "SlotOut": {
         "properties": {
@@ -3771,6 +4443,45 @@
           "user"
         ],
         "title": "TokenResponse"
+      },
+      "ToolStatus": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "start",
+              "end"
+            ],
+            "title": "Status"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ok"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "status",
+          "label"
+        ],
+        "title": "ToolStatus",
+        "description": "Dòng trạng thái của một lần gọi tool; chỉ có tên và nhãn, không có tham số (docs mục 8.4)."
       },
       "UpdateMeRequest": {
         "properties": {

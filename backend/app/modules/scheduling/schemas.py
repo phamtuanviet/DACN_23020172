@@ -61,3 +61,24 @@ class Alternative(BaseModel):
     doctor_id: int
     start_at: datetime
     end_at: datetime
+
+
+class SlotOption(BaseModel):
+    """Một khung cụ thể với một bác sĩ, để Agent trình bày và tạo đề xuất (docs mục 6.3)."""
+
+    doctor_id: int
+    doctor_name: str
+    start_at: datetime
+    end_at: datetime
+    label: str = Field(description="Nhãn có sẵn để đọc lại, ví dụ “Thứ Bảy 17/10, 08:00–08:20”")
+
+
+class SlotSearchOut(BaseModel):
+    service: ServiceSummary
+    slots: list[SlotOption]
+    more: bool = Field(description="Còn khung khác ngoài số khung trả về")
+    nearest_dates: list[date] = Field(description="Chỉ có khi khoảng được hỏi đã kín")
+    alternatives: list[SlotOption] = Field(
+        description="Tối đa 3 khung gần nhất ngoài yêu cầu (buổi khác, ngày khác, bác sĩ khác), "
+        "chỉ có khi khoảng được hỏi đã kín (UC09 4a)"
+    )

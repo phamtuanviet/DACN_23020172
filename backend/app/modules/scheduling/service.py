@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.core.errors import AppError, field_error, not_found
-from app.core.timeutil import local_datetime, to_local
+from app.core.timeutil import format_slot, local_datetime, to_local
 from app.core.validation import MAX_DATE, MIN_DATE
 from app.modules.catalog.schemas import DoctorRef
 from app.modules.catalog.service import ServiceInfo, get_bookable_service, get_bookable_services
@@ -35,7 +35,9 @@ from app.modules.scheduling.schemas import (
     EarliestItem,
     EarliestOut,
     ServiceSummary,
+    SlotOption,
     SlotOut,
+    SlotSearchOut,
 )
 
 MAX_RANGE_DAYS = 31
@@ -282,6 +284,19 @@ class AvailabilityQuery:
     time_to: time | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class SlotSearch:
+    """Tham số tìm khung của Agent: ngày dạng chuẩn, buổi đã đổi thành khoảng giờ (docs mục 6.3)."""
+
+    service_id: int
+    date_from: date
+    date_to: date
+    doctor_id: int | None = None
+    time_from: time | None = None
+    time_to: time | None = None
+    limit: int = 5
+
+
 class SchedulingService:
     def __init__(self, session: AsyncSession, clock: Clock, settings: Settings) -> None:
         self._session = session
@@ -363,6 +378,132 @@ class SchedulingService:
             )
         return EarliestOut(items=items)
 
+    async def find_slots(self, query: SlotSearch) -> SlotSearchOut:
+        """Khung trống cụ thể cho Agent (FR-SCH-04, 05; UC09 bước 4 và 4a).
+
+        Mỗi giờ bắt đầu chọn một bác sĩ (ít lịch nhất trong ngày), để vài khung đầu tiên trải ra
+        nhiều giờ khác nhau. Khoảng được hỏi đã kín thì kèm ngày gần nhất còn khung và tối đa
+        3 khung gần nhất trong cửa sổ 30 ngày, kể cả của bác sĩ khác.
+        """
+        window = BookingWindow.starting(self._clock.now(), self._settings)
+        _validate_query(query.date_from, query.date_to, query.time_from, query.time_to)
+        date_from = max(query.date_from, window.today)
+        date_to = min(query.date_to, window.last_day)
+        async with self._session.begin():
+            service = await get_bookable_service(self._session, query.service_id)
+            if service is None:
+                raise service_not_found()
+            duration = timedelta(minutes=service.duration_min)
+            options: list[SlotOption] = []
+            if date_from <= date_to:
+                snapshot = await load_snapshot(
+                    self._session, [service.id], date_from, date_to, doctor_id=query.doctor_id
+                )
+                if query.doctor_id is not None and query.doctor_id not in snapshot.doctors.names:
+                    raise doctor_service_mismatch()
+                slots = compute_slots(
+                    snapshot.doctors.shifts,
+                    snapshot.busy(),
+                    duration,
+                    _days(date_from, date_to),
+                    window.now,
+                    window.end,
+                    query.time_from,
+                    query.time_to,
+                )
+                options = _one_per_start(slots, snapshot, prefer=query.doctor_id)
+            nearest: list[date] = []
+            alternatives: list[SlotOption] = []
+            if not options:
+                nearest = await self._nearest_dates(
+                    service,
+                    AvailabilityQuery(
+                        service.id,
+                        query.doctor_id,
+                        time_from=query.time_from,
+                        time_to=query.time_to,
+                    ),
+                    max(query.date_to + timedelta(days=1), window.today),
+                    window,
+                )
+                alternatives = await self._alternatives(service, query, window)
+        return SlotSearchOut(
+            service=ServiceSummary(
+                id=service.id, name=service.name, duration_min=service.duration_min
+            ),
+            slots=options[: query.limit],
+            more=len(options) > query.limit,
+            nearest_dates=nearest,
+            alternatives=alternatives,
+        )
+
+    async def _alternatives(
+        self, service: ServiceInfo, query: SlotSearch, window: BookingWindow
+    ) -> list[SlotOption]:
+        """Tối đa 3 phương án khi khoảng được hỏi đã kín (UC09 4a), theo thứ tự ưu tiên:
+        ngày gần nhất còn khung đúng buổi (2 khung đầu), buổi khác trong ngày được hỏi (khung gần
+        buổi đó nhất), bác sĩ khác đúng ngày đúng buổi khi người dùng đã chọn bác sĩ. Không có gì
+        thì lấy các khung sớm nhất từ ngày được hỏi trở đi.
+        """
+        snapshot = await load_snapshot(self._session, [service.id], window.today, window.last_day)
+        computed = compute_slots(
+            snapshot.doctors.shifts,
+            snapshot.busy(),
+            timedelta(minutes=service.duration_min),
+            _days(window.today, window.last_day),
+            window.now,
+            window.end,
+        )
+        # Mỗi giờ bắt đầu một khung: bác sĩ đã chọn nếu còn trống, không thì người ít lịch nhất.
+        slots = [
+            Slot(o.doctor_id, o.start_at, o.end_at)
+            for o in _one_per_start(computed, snapshot, prefer=query.doctor_id)
+        ]
+
+        def day(slot: Slot) -> date:
+            return to_local(slot.start).date()
+
+        def in_part(slot: Slot) -> bool:
+            start, end = to_local(slot.start).time(), to_local(slot.end).time()
+            after = query.time_from is None or start >= query.time_from
+            before = query.time_to is None or (end <= query.time_to and end > start)
+            return after and before
+
+        def asked_day(slot: Slot) -> bool:
+            return query.date_from <= day(slot) <= query.date_to
+
+        def same_doctor(slot: Slot) -> bool:
+            return query.doctor_id is None or slot.doctor_id == query.doctor_id
+
+        picks: list[Slot] = []
+        later = [s for s in slots if same_doctor(s) and in_part(s) and day(s) > query.date_to]
+        if later:
+            picks += [s for s in later if day(s) == day(later[0])][:2]
+        other_part = [s for s in slots if same_doctor(s) and asked_day(s) and not in_part(s)]
+        if other_part:
+            target = local_datetime(query.date_from, query.time_from or time(0))
+            picks.append(min(other_part, key=lambda s: (abs(s.start - target), s.start)))
+        if query.doctor_id is not None:
+            other_doctor = [
+                s
+                for s in computed
+                if s.doctor_id != query.doctor_id and asked_day(s) and in_part(s)
+            ]
+            picks += other_doctor[:1]
+        if not picks:
+            picks = [s for s in slots if same_doctor(s) and day(s) >= query.date_from][:3]
+        chosen = sorted({s.start: s for s in picks}.values(), key=lambda s: s.start)
+        return [
+            SlotOption(
+                doctor_id=s.doctor_id,
+                doctor_name=snapshot.doctors.names[s.doctor_id],
+                start_at=to_local(s.start),
+                end_at=to_local(s.end),
+                label=format_slot(s.start, s.end),
+            )
+            for s in chosen[:ALTERNATIVES_LIMIT]
+        ]
+
     async def _nearest_dates(
         self, service: ServiceInfo, query: AvailabilityQuery, first_day: date, window: BookingWindow
     ) -> list[date]:
@@ -426,3 +567,28 @@ def _group_by_day(days: list[date], slots: list[Slot], snapshot: Snapshot) -> li
             status = DayStatus.OFF
         result.append(DayOut(date=day, status=status, slots=day_slots))
     return result
+
+
+def _one_per_start(
+    slots: list[Slot], snapshot: Snapshot, *, prefer: int | None
+) -> list[SlotOption]:
+    """Mỗi giờ bắt đầu một khung: bác sĩ `prefer` nếu còn trống, không thì người ít lịch nhất."""
+    by_start: dict[datetime, list[Slot]] = {}
+    for slot in slots:
+        by_start.setdefault(slot.start, []).append(slot)
+    options: list[SlotOption] = []
+    for start, group in sorted(by_start.items()):
+        day = to_local(start).date()
+        chosen = next((s for s in group if s.doctor_id == prefer), None) or min(
+            group, key=lambda s: (snapshot.booked_count(s.doctor_id, day), s.doctor_id)
+        )
+        options.append(
+            SlotOption(
+                doctor_id=chosen.doctor_id,
+                doctor_name=snapshot.doctors.names[chosen.doctor_id],
+                start_at=to_local(chosen.start),
+                end_at=to_local(chosen.end),
+                label=format_slot(chosen.start, chosen.end),
+            )
+        )
+    return options

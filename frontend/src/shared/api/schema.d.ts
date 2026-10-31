@@ -589,6 +589,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Agent Status */
+        get: operations["agent_status_api_v1_agent_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chat
+         * @description Gửi tin nhắn, nhận phản hồi dạng SSE: meta, token, tool, services, slots, proposal, error,
+         *     done (docs mục 8.4). 429 AGENT_QUOTA_EXCEEDED khi hết 50 tin nhắn trong ngày, 503
+         *     AGENT_UNAVAILABLE khi trợ lý tạm ngưng.
+         */
+        post: operations["chat_api_v1_agent_chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/conversations/{conversation_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Conversation Messages */
+        get: operations["conversation_messages_api_v1_agent_conversations__conversation_id__messages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/proposals/{proposal_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Proposal
+         * @description Bệnh nhân bấm Xác nhận trên thẻ. Thất bại thì trả nguyên mã lỗi của web (SLOT_TAKEN kèm
+         *     khung thay thế, CHANGE_DEADLINE_PASSED…) với `details.proposal_status`.
+         */
+        post: operations["confirm_proposal_api_v1_agent_proposals__proposal_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/proposals/{proposal_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Proposal */
+        post: operations["reject_proposal_api_v1_agent_proposals__proposal_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -618,6 +712,18 @@ export interface components {
             patient_name: string;
             /** Needs Attention */
             needs_attention: boolean;
+        };
+        /** AgentStatus */
+        AgentStatus: {
+            /**
+             * Available
+             * @description Trợ lý đang nhận tin nhắn (có mô hình, chưa ngắt mạch)
+             */
+            available: boolean;
+            /** Daily Limit */
+            daily_limit: number;
+            /** Remaining Quota */
+            remaining_quota: number;
         };
         /** AppointmentDetail */
         AppointmentDetail: {
@@ -774,6 +880,73 @@ export interface components {
          * @enum {string}
          */
         Channel: "WEB" | "AGENT" | "ADMIN" | "SYSTEM";
+        /**
+         * ChatItem
+         * @description Một dòng trong khung chat khi tải lại hội thoại (docs mục 9.5).
+         */
+        ChatItem: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "user" | "assistant" | "tool";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Text */
+            text?: string | null;
+            /**
+             * Hidden
+             * @description Lượt tự gửi sau đề xuất thất bại
+             * @default false
+             */
+            hidden: boolean;
+            tool?: components["schemas"]["ToolStatus"] | null;
+            /** Services */
+            services?: components["schemas"]["ServiceOption"][] | null;
+            /** Slots */
+            slots?: components["schemas"]["SlotOption"][] | null;
+            proposal?: components["schemas"]["ProposalOut"] | null;
+        };
+        /** ChatRequest */
+        ChatRequest: {
+            /**
+             * Conversation Id
+             * @description Bỏ trống ở tin nhắn đầu tiên: backend tạo hội thoại mới
+             */
+            conversation_id?: string | null;
+            /** Message */
+            message: string;
+            /**
+             * Trigger
+             * @description Lượt giao diện tự gửi sau khi xác nhận đề xuất thất bại vì khung vừa bị đặt (docs mục 6.4); backend thay nội dung tin nhắn bằng câu dựng sẵn
+             */
+            trigger?: "proposal_failed" | null;
+        };
+        /**
+         * ConfirmOut
+         * @description Kết quả xác nhận: cùng cấu trúc lịch hẹn của web, kèm trạng thái đề xuất (docs mục 6.4).
+         */
+        ConfirmOut: {
+            proposal: components["schemas"]["ProposalOut"];
+            appointment: components["schemas"]["AppointmentOut"];
+        };
+        /** ConversationOut */
+        ConversationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Items */
+            items: components["schemas"]["ChatItem"][];
+            /** Remaining Quota */
+            remaining_quota: number;
+        };
         /** DayOut */
         DayOut: {
             /**
@@ -946,6 +1119,76 @@ export interface components {
              */
             age: number | null;
         };
+        /**
+         * ProposalDisplay
+         * @description Chữ trên thẻ xác nhận, do backend dựng từ dữ liệu đã kiểm tra (không phải chữ của LLM).
+         */
+        ProposalDisplay: {
+            /** Service */
+            service: string;
+            /** Doctor */
+            doctor: string;
+            /**
+             * When
+             * @description Ví dụ “Thứ Bảy, 17/10/2026 · 08:00–08:20”
+             */
+            when: string;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Code
+             * @description Mã lịch đang đổi hoặc hủy
+             */
+            code?: string | null;
+            /**
+             * Old When
+             * @description Đổi lịch: giờ cũ
+             */
+            old_when?: string | null;
+            /**
+             * Old Doctor
+             * @description Đổi lịch sang bác sĩ khác
+             */
+            old_doctor?: string | null;
+        };
+        /** ProposalOut */
+        ProposalOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            type: components["schemas"]["ProposalType"];
+            status: components["schemas"]["ProposalStatus"];
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            display: components["schemas"]["ProposalDisplay"];
+            /** Appointment Id */
+            appointment_id: number | null;
+            /**
+             * Appointment Code
+             * @description Mã lịch sau khi xác nhận
+             */
+            appointment_code?: string | null;
+            /**
+             * Error
+             * @description Lý do khi status = FAILED
+             */
+            error?: string | null;
+        };
+        /**
+         * ProposalStatus
+         * @enum {string}
+         */
+        ProposalStatus: "PENDING" | "CONFIRMED" | "REJECTED" | "EXPIRED" | "FAILED";
+        /**
+         * ProposalType
+         * @enum {string}
+         */
+        ProposalType: "BOOK" | "RESCHEDULE" | "CANCEL";
         /** RegisterRequest */
         RegisterRequest: {
             /** Full Name */
@@ -1043,6 +1286,24 @@ export interface components {
             duration_min: number;
             /** Ref Price Vnd */
             ref_price_vnd: number;
+        };
+        /**
+         * ServiceOption
+         * @description Dịch vụ khớp từ khóa, hiện thành thẻ có nút "Tìm giờ khám".
+         */
+        ServiceOption: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Specialty */
+            specialty: string;
+            /** Duration Min */
+            duration_min: number;
+            /** Ref Price Vnd */
+            ref_price_vnd: number;
+            /** Scope Description */
+            scope_description: string;
         };
         /** ServiceOut */
         ServiceOut: {
@@ -1175,6 +1436,31 @@ export interface components {
             valid_from?: string | null;
             /** Valid To */
             valid_to?: string | null;
+        };
+        /**
+         * SlotOption
+         * @description Một khung cụ thể với một bác sĩ, để Agent trình bày và tạo đề xuất (docs mục 6.3).
+         */
+        SlotOption: {
+            /** Doctor Id */
+            doctor_id: number;
+            /** Doctor Name */
+            doctor_name: string;
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /**
+             * End At
+             * Format: date-time
+             */
+            end_at: string;
+            /**
+             * Label
+             * @description Nhãn có sẵn để đọc lại, ví dụ “Thứ Bảy 17/10, 08:00–08:20”
+             */
+            label: string;
         };
         /** SlotOut */
         SlotOut: {
@@ -1340,6 +1626,23 @@ export interface components {
              */
             expires_at: string;
             user: components["schemas"]["MeResponse"];
+        };
+        /**
+         * ToolStatus
+         * @description Dòng trạng thái của một lần gọi tool; chỉ có tên và nhãn, không có tham số (docs mục 8.4).
+         */
+        ToolStatus: {
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "start" | "end";
+            /** Label */
+            label: string;
+            /** Ok */
+            ok?: boolean | null;
         };
         /**
          * UpdateMeRequest
@@ -2469,6 +2772,152 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_status_api_v1_agent_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentStatus"];
+                };
+            };
+        };
+    };
+    chat_api_v1_agent_chat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    conversation_messages_api_v1_agent_conversations__conversation_id__messages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_proposal_api_v1_agent_proposals__proposal_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfirmOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_proposal_api_v1_agent_proposals__proposal_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalOut"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 from alembic.config import Config
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine, make_url, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -82,7 +83,8 @@ def clock() -> MutableClock:
 
 
 @pytest.fixture
-async def app_client(test_database_url: str, clock: MutableClock) -> AsyncIterator[AsyncClient]:
+async def app(test_database_url: str, clock: MutableClock) -> FastAPI:
+    """App trên database đã dọn sạch; test thay dependency qua `app.dependency_overrides`."""
     tables = ", ".join(f'"{table.name}"' for table in Base.metadata.sorted_tables)
     async with get_engine().begin() as conn:
         await conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
@@ -90,6 +92,11 @@ async def app_client(test_database_url: str, clock: MutableClock) -> AsyncIterat
 
     app = create_app(Settings(_env_file=None, app_env=Environment.DEVELOPMENT))
     app.dependency_overrides[get_clock] = lambda: clock
+    return app
+
+
+@pytest.fixture
+async def app_client(app: FastAPI) -> AsyncIterator[AsyncClient]:
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://testserver"
     ) as client:

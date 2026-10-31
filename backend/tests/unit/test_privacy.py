@@ -60,3 +60,21 @@ def test_sentry_events_drop_request_body_query_and_cookies() -> None:
 
 def test_sql_errors_do_not_carry_parameter_values() -> None:
     assert get_engine().sync_engine.hide_parameters
+
+
+def test_sentry_never_records_llm_prompts() -> None:
+    """Nội dung chat là dữ liệu cá nhân: integration LLM của Sentry không gửi prompt, trả lời."""
+    from app.core.observability import llm_integrations
+
+    integrations = llm_integrations()
+    assert len(integrations) == 3
+    assert all(getattr(i, "include_prompts", True) is False for i in integrations)
+
+
+def test_log_filter_masks_personal_fields() -> None:
+    """Lớp chặn cuối của log: khóa nhạy cảm bị che, khóa khác giữ nguyên."""
+    from app.core.logging import REDACTED, redact_sensitive
+
+    event = {"event": "x", "email": "lan@example.com", "reason": "Nổi mẩn", "tool": "search"}
+    masked = redact_sensitive(None, "info", event)
+    assert masked == {"event": "x", "email": REDACTED, "reason": REDACTED, "tool": "search"}

@@ -19,9 +19,40 @@ _VALID_REQUEST_ID = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 log = structlog.get_logger("http")
 
 
+# Khóa không bao giờ được ghi giá trị vào log (AGENTS.md, docs mục 4.5): code không log các khóa
+# này; bộ lọc chỉ là lớp chặn cuối khi có người lỡ truyền vào.
+SENSITIVE_KEYS = frozenset(
+    {
+        "message",
+        "content",
+        "text",
+        "reason",
+        "cancel_reason",
+        "summary",
+        "email",
+        "phone",
+        "full_name",
+        "date_of_birth",
+        "password",
+        "token",
+        "authorization",
+    }
+)
+REDACTED = "[ẩn]"
+
+
+def redact_sensitive(
+    _: object, __: str, event_dict: structlog.types.EventDict
+) -> structlog.types.EventDict:
+    for key in SENSITIVE_KEYS & event_dict.keys():
+        event_dict[key] = REDACTED
+    return event_dict
+
+
 def configure_logging(settings: Settings) -> None:
     shared: list[structlog.types.Processor] = [
         structlog.contextvars.merge_contextvars,
+        redact_sensitive,
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
     ]

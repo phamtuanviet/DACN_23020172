@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.actor import Actor
 from app.core.clock import Clock
 from app.core.config import Settings
+from app.core.db import transaction
 from app.core.errors import AppError, field_error, forbidden, not_found, violated_constraint
 from app.core.timeutil import to_local
 from app.db.enums import AppointmentStatus, HistoryAction, NotificationType, UserRole
@@ -175,6 +176,23 @@ async def flag_for_attention(
     return flagged
 
 
+@dataclass(frozen=True, slots=True)
+class Preview:
+    """Kết quả kiểm tra trước một thao tác ghi, chưa ghi gì: Agent dựng thẻ đề xuất từ đây."""
+
+    service_id: int
+    service_name: str
+    doctor_id: int
+    doctor_name: str
+    start_at: datetime
+    end_at: datetime
+    appointment_id: int | None = None  # đổi, hủy: lịch đang có
+    code: str | None = None
+    old_start_at: datetime | None = None  # đổi lịch: giờ cũ
+    old_end_at: datetime | None = None
+    old_doctor_name: str | None = None
+
+
 def _age(birthday: date | None, today: date) -> int | None:
     if birthday is None:
         return None
@@ -212,7 +230,7 @@ class AppointmentService:
         window = BookingWindow.starting(self._clock.now(), self._settings)
         if not window.contains(data.start_at):
             raise booking_window_error(self._settings.booking_window_days)
-        async with self._session.begin():
+        async with transaction(self._session):
             patient = await repo.lock_patient(self._session, patient_id)
             if patient is None or not patient.is_active or patient.anonymized_at is not None:
                 raise forbidden()
@@ -350,7 +368,7 @@ class AppointmentService:
         """
         window = BookingWindow.starting(self._clock.now(), self._settings)
         doctor_id = data.doctor_id
-        async with self._session.begin():
+        async with transaction(self._session):
             await self._find_for_change(actor, appointment_id, window.now)
             await repo.lock_doctors_shared(self._session, [doctor_id])
             appointment = await self._lock_for_change(actor, appointment_id, window.now)
@@ -391,7 +409,7 @@ class AppointmentService:
         """Hủy lịch (UC07, FR-APT-03): khung giờ được trả lại ngay vì constraint chỉ áp cho lịch
         BOOKED/ARRIVED. Lý do hủy là dữ liệu cá nhân: không ghi vào log, history."""
         now = self._clock.now()
-        async with self._session.begin():
+        async with transaction(self._session):
             await self._find_for_change(actor, appointment_id, now)
             appointment = await self._lock_for_change(actor, appointment_id, now)
             old = history_value(appointment)
@@ -442,6 +460,100 @@ class AppointmentService:
             channel=actor.channel.value,
         )
         return self._out(appointment, service_name, doctor_name, actor, now)
+
+    # ------------------------------------------------------------ kiểm tra trước (Agent)
+    async def preview_book(self, actor: Actor, data: BookRequest) -> Preview:
+        """Kiểm tra như `book` mà không khóa, không ghi: đề xuất BOOK của Agent (docs mục 6.3).
+
+        Chỉ để không hiện thẻ chắc chắn thất bại; lúc bệnh nhân xác nhận, `book` kiểm lại từ đầu.
+        """
+        patient_id = policy.ensure_can_book(actor)
+        if data.doctor_id is None:
+            raise field_error("doctor_id", "Đề xuất phải chọn rõ một bác sĩ.")
+        window = BookingWindow.starting(self._clock.now(), self._settings)
+        if not window.contains(data.start_at):
+            raise booking_window_error(self._settings.booking_window_days)
+        async with self._session.begin():
+            patient = await repo.get_patient(self._session, patient_id)
+            if patient is None or not patient.is_active or patient.anonymized_at is not None:
+                raise forbidden()
+            service = await self._bookable_service(data.service_id)
+            candidates = await ensure_slot_bookable(
+                self._session, service, data.start_at, window, doctor_id=data.doctor_id
+            )
+            limit = self._settings.max_active_appointments
+            if await repo.count_upcoming_booked(self._session, patient_id, window.now) >= limit:
+                raise max_active_appointments(limit)
+            end_at = data.start_at + timedelta(minutes=service.duration_min)
+            if await repo.patient_has_overlap(self._session, patient_id, data.start_at, end_at):
+                raise patient_overlap()
+        doctor = candidates[0]
+        return Preview(
+            service.id, service.name, doctor.doctor_id, doctor.name, data.start_at, end_at
+        )
+
+    async def preview_reschedule(
+        self, actor: Actor, appointment_id: int, data: RescheduleRequest
+    ) -> Preview:
+        """Kiểm tra như `reschedule` (quyền, BR-07, BR-08, khung còn trống) mà không ghi."""
+        window = BookingWindow.starting(self._clock.now(), self._settings)
+        async with self._session.begin():
+            appointment = await self._find_for_change(actor, appointment_id, window.now)
+            if not window.contains(data.start_at):
+                raise booking_window_error(self._settings.booking_window_days)
+            if appointment.doctor_id == data.doctor_id and appointment.start_at == data.start_at:
+                raise field_error("start_at", "Hãy chọn khung giờ khác với lịch hiện tại.")
+            service = await self._bookable_service(appointment.service_id)
+            candidates = await ensure_slot_bookable(
+                self._session,
+                service,
+                data.start_at,
+                window,
+                doctor_id=data.doctor_id,
+                exclude_appointment_id=appointment.id,
+            )
+            end_at = data.start_at + timedelta(minutes=service.duration_min)
+            overlap = await repo.patient_has_overlap(
+                self._session,
+                appointment.patient_id,
+                data.start_at,
+                end_at,
+                exclude_id=appointment.id,
+            )
+            if overlap:
+                raise patient_overlap()
+            _, old_doctor_name = await repo.labels(self._session, appointment)
+        doctor = candidates[0]
+        return Preview(
+            service.id,
+            service.name,
+            doctor.doctor_id,
+            doctor.name,
+            data.start_at,
+            end_at,
+            appointment_id=appointment.id,
+            code=appointment.code,
+            old_start_at=appointment.start_at,
+            old_end_at=appointment.end_at,
+            old_doctor_name=old_doctor_name,
+        )
+
+    async def preview_cancel(self, actor: Actor, appointment_id: int) -> Preview:
+        """Kiểm tra như `cancel` (quyền, trạng thái, BR-08) mà không ghi."""
+        now = self._clock.now()
+        async with self._session.begin():
+            appointment = await self._find_for_change(actor, appointment_id, now)
+            service_name, doctor_name = await repo.labels(self._session, appointment)
+        return Preview(
+            appointment.service_id,
+            service_name,
+            appointment.doctor_id,
+            doctor_name,
+            appointment.start_at,
+            appointment.end_at,
+            appointment_id=appointment.id,
+            code=appointment.code,
+        )
 
     # ------------------------------------------------------------ nội bộ
     async def _find_for_change(
