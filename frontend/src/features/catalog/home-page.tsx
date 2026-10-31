@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { AskAssistantButton } from "@/shared/agent/ask-assistant";
 import type { Doctor, Service, Specialty } from "@/shared/api/types";
 import { formatPrice } from "@/shared/lib/format";
 import { CLINIC, TEXT } from "@/shared/texts";
@@ -267,10 +268,7 @@ function AssistantSection() {
               ))}
             </span>
           </div>
-          <p className="flex items-start gap-2 rounded-control bg-surface/70 px-3.5 py-3 text-sm text-subtle">
-            <ChatIcon size={18} className="mt-0.5 shrink-0 text-primary" />
-            {TEXT.home.assistantSoon}
-          </p>
+          <AskAssistantButton variant="primary" className="self-start" />
           <p className="text-[13px] leading-[19px] text-subtle">{TEXT.home.assistantNote}</p>
         </div>
       </div>

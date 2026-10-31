@@ -16,6 +16,7 @@ src/
 ├── features/<tên>/      giao diện + logic của một tính năng; bên ngoài chỉ dùng qua index.ts
 ├── shared/
 │   ├── api/               client.ts (trình duyệt), server.ts (server component), schema.d.ts (sinh tự động)
+│   ├── agent/             khung chat đang mở hay đóng, nút "Hỏi trợ lý" (mọi trang mở được khung chat)
 │   ├── appointments/      hook lịch hẹn dùng chung booking và my-appointments
 │   ├── auth/  availability/  config/  lib/  layout/  ui/
 └── proxy.ts             Content-Security-Policy có nonce
@@ -38,6 +39,7 @@ npm ci
 npm run dev          # http://localhost:3000, /api/* chuyển tới backend :8000
 npm run lint && npm run typecheck && npm test
 npm run e2e          # Playwright; E2E_BASE_URL=https://staging... để chạy trên staging
+E2E_FAKE_LLM=1 npm run e2e   # thêm e2e khung chat; backend chạy LLM_PROVIDER=fake (không tốn phí LLM)
 ```
 
 Thêm component shadcn/ui khi cần: `npx shadcn@latest add button` (đặt vào `src/shared/ui`).

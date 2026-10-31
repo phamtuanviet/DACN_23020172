@@ -57,6 +57,13 @@
     @apply bg-ground font-sans text-ink antialiased;
   }
 
+  /* Khung chat của trợ lý mở trên máy tính: trang phía sau chừa chỗ, vẫn cuộn và bấm được. */
+  @media (min-width: 1024px) {
+    html[data-chat-open] body {
+      padding-right: 420px;
+    }
+  }
+
   :focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;

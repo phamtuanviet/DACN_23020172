@@ -9,6 +9,7 @@ export type ApiError = {
     request_id?: string;
     clinic_phone?: string | null;
     alternatives?: { doctor_id: number; start_at: string; end_at: string }[];
+    proposal_status?: string;
   };
 };
 
@@ -31,6 +32,11 @@ const MESSAGES: Record<string, string> = {
   // Không dịch lại, dùng message của backend vì cụ thể hơn: SHIFT_OVERLAP (nêu ca bị chồng),
   // CHANGE_DEADLINE_PASSED (kèm số điện thoại phòng khám), INVALID_TRANSITION (nêu trạng thái).
   AGENT_UNAVAILABLE: "Trợ lý tạm thời không hoạt động, bạn vẫn đặt lịch được trên trang Đặt lịch.",
+  AGENT_TIMEOUT:
+    "Trợ lý phản hồi quá lâu nên đã dừng. Bạn thử lại, hoặc đặt lịch trên trang Đặt lịch.",
+  AGENT_QUOTA_EXCEEDED: "Bạn đã dùng hết lượt trò chuyện với trợ lý hôm nay.",
+  PROPOSAL_EXPIRED: "Đề xuất đã hết hạn nên chưa có gì thay đổi.",
+  PROPOSAL_NOT_PENDING: "Đề xuất này đã được xử lý trước đó.",
   INTERNAL_ERROR: GENERIC_ERROR,
 };
 

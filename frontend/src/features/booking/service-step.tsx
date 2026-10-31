@@ -12,6 +12,7 @@ import { bookingHref, type BookingState } from "@/shared/availability/booking-hr
 import { cn } from "@/shared/lib/cn";
 import { formatDuration, formatPrice } from "@/shared/lib/format";
 import { specialtyMedia } from "@/shared/lib/specialty-media";
+import { AskAssistantButton } from "@/shared/agent/ask-assistant";
 import { TEXT } from "@/shared/texts";
 import { Alert } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
@@ -188,13 +189,13 @@ export function ServiceStep({ state }: { state: BookingState }) {
         ))}
       </div>
 
-      <p className="flex items-center gap-3 rounded-card border border-dashed border-[#9aaaae] px-4 py-3.5">
+      <div className="flex flex-wrap items-center gap-3 rounded-card border border-dashed border-[#9aaaae] px-4 py-3.5">
         <ChatIcon size={22} className="shrink-0 text-primary" />
-        <span>
-          <b>{TEXT.booking.assistantTitle}</b> {TEXT.booking.assistantBody}{" "}
-          <span className="text-muted">{TEXT.home.assistantSoon}</span>
+        <span className="min-w-0 flex-1 basis-60">
+          <b>{TEXT.booking.assistantTitle}</b> {TEXT.booking.assistantBody}
         </span>
-      </p>
+        <AskAssistantButton />
+      </div>
     </section>
   );
 }

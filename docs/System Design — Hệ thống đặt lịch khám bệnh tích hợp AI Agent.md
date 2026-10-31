@@ -940,6 +940,7 @@ frontend/
 │   │   │                     # · client.ts (trình duyệt: gắn token, tự refresh) · errors.ts (code → thông báo)
 │   │   ├── auth/             # authStore (Zustand) · RoleGuard
 │   │   ├── availability/     # useAvailability, useEarliest, bộ chọn khung giờ, liên kết vào wizard — dùng chung catalog, booking, my-appointments
+│   │   ├── agent/            # khung chat đang mở hay đóng, nút "Hỏi trợ lý" — để mọi trang mở được khung chat
 │   │   ├── appointments/     # hook đặt, xem, đổi, hủy lịch; mô tả lịch sử thay đổi; file .ics — dùng chung booking và my-appointments
 │   │   ├── ui/               # component shadcn/ui
 │   │   └── lib/              # datetime.ts (Asia/Ho_Chi_Minh) · format.ts
@@ -1009,6 +1010,9 @@ flowchart TB
 - `useAgentChat` gọi `POST /api/v1/agent/chat` bằng `fetch` và đọc stream qua thư viện `@microsoft/fetch-event-source`, vì `EventSource` chuẩn của trình duyệt chỉ hỗ trợ GET và không gửi được header `Authorization`. Luồng SSE đi thẳng từ trình duyệt tới FastAPI qua Caddy, không qua server Next.js.
 - `ProposalCard` hiển thị trường `display` do backend dựng (dịch vụ, bác sĩ, thứ, ngày, giờ), đếm ngược tới `expires_at` và tự khóa nút khi hết hạn. Bấm Xác nhận gọi thẳng endpoint confirm, không gửi tin nhắn cho Agent; thành công thì invalidate `['appointments', 'me']` để trang "Lịch của tôi" cập nhật ngay.
 - Khi mở lại trang, widget tải `GET /agent/conversations/{id}/messages` theo `conversation_id` trong `sessionStorage`, gồm cả trạng thái các thẻ đề xuất.
+- Trạng thái hội thoại không qua TanStack Query: `useAgentChat` dựng các lượt bằng một reducer thuần từ sự kiện SSE hoặc từ hội thoại tải lại (`features/agent-chat/reducer.ts`). Mỗi lượt hiện theo thiết kế AI-desktop: câu hỏi, các dòng trạng thái tool, bong bóng trả lời có nút khung giờ (sự kiện `slots`) hoặc thẻ dịch vụ (sự kiện `services`, chỉ khi lượt đó không có khung giờ), thẻ đề xuất. Bấm nút khung giờ gửi một tin nhắn như "Đặt lịch Thứ Bảy 17/10, 08:00–08:20 với ThS. BS. Trần Minh" (UC09 bước 5).
+- Máy tính: panel 420 px bên phải, trang phía sau chừa lề bằng `html[data-chat-open]` nên vẫn đọc và bấm được; nút nổi "Hỏi trợ lý" khi panel đóng. Điện thoại: khung chat toàn màn hình, mở từ tab "Trợ lý" của thanh tab dưới đáy. Khách bấm "Hỏi trợ lý" thì đăng nhập rồi quay lại trang cũ với `?chat=1` để khung chat mở sẵn.
+- `fetch-event-source` chạy với `openWhenHidden` và không tự kết nối lại: kết nối lại sẽ gửi lặp tin nhắn. Access token hết hạn (401 trước khi mở luồng) thì refresh rồi gửi lại một lần, vì backend chưa lưu gì.
 
 ### 9.6 Quy ước giao diện
 

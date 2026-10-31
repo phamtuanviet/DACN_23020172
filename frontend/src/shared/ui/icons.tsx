@@ -135,3 +135,26 @@ export const RefreshIcon = (p: IconProps) => (
     <path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6" />
   </Icon>
 );
+export const HeadsetIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M5 13v-1a7 7 0 0 1 14 0v1" />
+    <rect x="3.5" y="13" width="4" height="6" rx="1.5" />
+    <rect x="16.5" y="13" width="4" height="6" rx="1.5" />
+  </Icon>
+);
+export const SendIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 12l16-8-6 16-2.5-6.5L4 12z" />
+  </Icon>
+);
+export const ClockIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 2" />
+  </Icon>
+);
+export const ShieldIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 3l7.5 3v5.5c0 4.5-3.2 8.2-7.5 9.5-4.3-1.3-7.5-5-7.5-9.5V6z" />
+  </Icon>
+);

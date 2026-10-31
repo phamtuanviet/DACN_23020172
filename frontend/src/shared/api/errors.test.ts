@@ -48,6 +48,16 @@ describe("errorMessage", () => {
   });
 
   it.each([
+    ["AGENT_UNAVAILABLE", "Đặt lịch"],
+    ["AGENT_TIMEOUT", "quá lâu"],
+    ["AGENT_QUOTA_EXCEEDED", "hết lượt"],
+    ["PROPOSAL_EXPIRED", "hết hạn"],
+    ["PROPOSAL_NOT_PENDING", "đã được xử lý"],
+  ])("có thông báo tiếng Việt cho lỗi của trợ lý %s", (code, text) => {
+    expect(errorMessage({ code, message: "x" })).toContain(text);
+  });
+
+  it.each([
     [
       "SHIFT_OVERLAP",
       "Ca này chồng lên ca 08:00–11:30 đã có (hiệu lực 01/10/2026 – không thời hạn).",

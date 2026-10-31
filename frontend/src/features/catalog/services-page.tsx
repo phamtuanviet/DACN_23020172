@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import type { Doctor, Service, Specialty } from "@/shared/api/types";
 import { cn } from "@/shared/lib/cn";
+import { AskAssistantButton } from "@/shared/agent/ask-assistant";
 import { TEXT } from "@/shared/texts";
 import { buttonClass } from "@/shared/ui/button";
 import { ChatIcon, GridIcon, SearchIcon } from "@/shared/ui/icons";
@@ -238,12 +239,12 @@ function EmptyState({ title }: { title: string }) {
 
 function AssistantHint() {
   return (
-    <p className="flex items-center gap-3 rounded-card border border-dashed border-[#9aaaae] px-4 py-3.5">
+    <div className="flex flex-wrap items-center gap-3 rounded-card border border-dashed border-[#9aaaae] px-4 py-3.5">
       <ChatIcon size={22} className="shrink-0 text-primary" />
-      <span>
-        <b>{TEXT.catalog.assistantTitle}</b> {TEXT.catalog.assistantBody}{" "}
-        <span className="text-muted">{TEXT.home.assistantSoon}</span>
+      <span className="min-w-0 flex-1 basis-60">
+        <b>{TEXT.catalog.assistantTitle}</b> {TEXT.catalog.assistantBody}
       </span>
-    </p>
+      <AskAssistantButton />
+    </div>
   );
 }
