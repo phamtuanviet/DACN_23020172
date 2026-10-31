@@ -1485,7 +1485,8 @@ Rollback là chạy lại `deploy.sh` với tag trước và bỏ qua bước mi
 
 ### 11.6 Môi trường dev (`compose.yaml`)
 
-- Dịch vụ: `db` (`postgres:16`), `valkey`, `mailpit` (SMTP giả, xem email tại `localhost:8025`), `backend` (Uvicorn `--reload`, mount mã nguồn, tự migrate khi khởi động; nạp dữ liệu giả bằng `make seed`), `worker`, `frontend` (`next dev`; `rewrites` trong `next.config.ts` chuyển `/api` → backend).
+- Dịch vụ: `db` (`postgres:16`), `valkey`, `mailpit` (SMTP giả, xem email tại `localhost:8025`), `backend` (Uvicorn `--reload`, mount mã nguồn, tự migrate khi khởi động; nạp dữ liệu giả bằng `make seed`), `worker`, `frontend` (`next dev`; `rewrites` trong `next.config.ts` chuyển `/api` → backend, kể cả luồng SSE của `/agent/chat`).
+- Agent: `compose.yaml` truyền `LLM_PROVIDER` (mặc định `openai`), `LLM_MODEL` (mặc định `gpt-4o-mini`) và `LLM_API_KEY` từ `.env` vào backend; file chỉ có `OPENAI_API_KEY` thì compose dùng giá trị đó cho `LLM_API_KEY`. Backend chỉ đọc `LLM_API_KEY`, để khóa của nhà cung cấp này không bị gửi sang nhà cung cấp khác. `LLM_PROVIDER=fake` dùng mô hình giả theo luật (`agent/fake_llm.py`): không gọi mạng, không tốn phí, dùng cho e2e; cấu hình staging, production từ chối giá trị này.
 - `docker compose up` dựng xong môi trường kèm tài khoản demo trong ≤ 5 phút trên máy mới (NFR-13), đủ cho việc chấm bài (AC-20).
 - Dùng chung Dockerfile backend với production; khác biệt chỉ nằm ở cấu hình. Mailpit và dữ liệu seed không bao giờ xuất hiện ở staging hay production.
 

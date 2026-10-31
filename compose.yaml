@@ -9,6 +9,11 @@ x-backend-env: &backend-env
   SMTP_HOST: mailpit
   SMTP_PORT: "1025"
   PUBLIC_BASE_URL: http://localhost:3000
+  # Agent (docs mục 6.8): đặt trong .env; LLM_PROVIDER=fake chạy mô hình giả, không tốn phí (e2e).
+  LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+  LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+  LLM_API_KEY: ${LLM_API_KEY:-${OPENAI_API_KEY:-}}   # .env có sẵn OPENAI_API_KEY cũng được
+  LANGSMITH_TRACING: "false"   # tracing gửi toàn bộ hội thoại ra ngoài (docs mục 6.8)
 
 services:
   db:
