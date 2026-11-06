@@ -1,11 +1,12 @@
-import { PagePlaceholder } from "@/shared/ui/page-placeholder";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
-export default function Page() {
-  return (
-    <PagePlaceholder
-      sprint={5}
-      title="Chi tiết lịch hẹn"
-      description="Trạng thái, ghi chú sau khám (UC18)."
-    />
-  );
+import { DoctorAppointmentPage } from "@/features/doctor";
+
+export const metadata: Metadata = { title: "Chi tiết lịch hẹn" };
+
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const id = Number((await params).id);
+  if (!Number.isInteger(id) || id <= 0) notFound();
+  return <DoctorAppointmentPage id={id} />;
 }

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   addDays,
   addMonths,
+  clinicDateTime,
   clinicDay,
   dayBadge,
   daysBetween,
@@ -14,7 +15,10 @@ import {
   formatSlot,
   formatStamp,
   formatTimeRange,
+  formatWeekRange,
+  isoWeekday,
   isValidDay,
+  mondayOf,
   monthGrid,
   weekdayName,
 } from "./datetime";
@@ -69,5 +73,23 @@ describe("lịch tháng và thẻ lịch hẹn", () => {
     expect(dayBadge("2026-10-16T17:30:00Z")).toEqual({ weekday: "T7", day: "17", month: "Th10" });
     expect(formatTimeRange("2026-10-17T01:00:00Z", "2026-10-17T01:20:00Z")).toBe("08:00–08:20");
     expect(formatStamp("2026-10-12T13:05:00Z")).toBe("12/10/2026 20:05");
+  });
+});
+
+describe("tuần làm việc", () => {
+  it("Thứ Hai của tuần và số thứ theo ca làm", () => {
+    expect(isoWeekday("2026-10-18")).toBe(7); // Chủ nhật
+    expect(isoWeekday("2026-10-19")).toBe(1);
+    expect(mondayOf("2026-10-18")).toBe("2026-10-12");
+    expect(mondayOf("2026-10-19")).toBe("2026-10-19");
+  });
+
+  it("khoảng tuần ngắn gọn, ghi đủ tháng khi sang tháng mới", () => {
+    expect(formatWeekRange("2026-10-19")).toBe("19–25/10/2026");
+    expect(formatWeekRange("2026-09-28")).toBe("28/09–04/10/2026");
+  });
+
+  it("giờ phòng khám đổi sang UTC bất kể múi giờ của máy", () => {
+    expect(clinicDateTime("2026-10-21", "07:00")).toBe("2026-10-21T00:00:00.000Z");
   });
 });

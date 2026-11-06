@@ -17,12 +17,16 @@ export const PATIENT_LINKS: NavLink[] = [
 ];
 
 export const STAFF_LINKS: Record<Exclude<Role, "PATIENT">, NavLink[]> = {
-  DOCTOR: [{ href: "/doctor/schedule", label: TEXT.staff.schedule }],
+  DOCTOR: [
+    { href: "/doctor/schedule", label: TEXT.staff.schedule, also: ["/doctor/appointments"] },
+  ],
   ADMIN: [
     { href: "/admin/dashboard", label: TEXT.staff.dashboard },
     { href: "/admin/appointments", label: TEXT.staff.appointments },
+    { href: "/admin/appointments?tab=queue", label: TEXT.staff.queue },
     { href: "/admin/catalog", label: TEXT.staff.catalog },
     { href: "/admin/doctors", label: TEXT.staff.doctors },
+    { href: "/admin/schedules", label: TEXT.staff.schedules },
   ],
 };
 

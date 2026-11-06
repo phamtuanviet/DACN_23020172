@@ -23,3 +23,21 @@ export type AppointmentScope = Schemas["Scope"];
 export type HistoryEntry = Schemas["HistoryEntry"];
 export type Channel = Schemas["Channel"];
 export type Me = Schemas["MeResponse"];
+export type PatientBrief = Schemas["PatientBrief"];
+export type PastVisit = Schemas["PastVisit"];
+// Bác sĩ (D-day, D-week, D-detail)
+export type DoctorSchedule = Schemas["DoctorScheduleOut"];
+export type ScheduleAppointment = Schemas["ScheduleAppointment"];
+export type TimeBlock = Schemas["TimeBlock"];
+export type TimeOffBlock = Schemas["TimeOffBlock"];
+// Quản trị (AD-*)
+export type AdminAppointment = Schemas["AdminAppointmentOut"];
+export type AdminAppointmentPage = Schemas["AdminAppointmentPage"];
+export type AttentionSource = Schemas["AttentionSource"];
+export type SupportRequest = Schemas["SupportRequestAdminOut"];
+export type SpecialtyAdmin = Schemas["SpecialtyAdminOut"];
+export type ServiceAdmin = Schemas["ServiceAdminOut"];
+export type DoctorAdmin = Schemas["DoctorAdminOut"];
+export type Shift = Schemas["ShiftOut"];
+export type TimeOff = Schemas["TimeOffOut"];
+export type AffectedAppointment = Schemas["AffectedOut"];

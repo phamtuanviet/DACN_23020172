@@ -1,11 +1,15 @@
-import { PagePlaceholder } from "@/shared/ui/page-placeholder";
+import type { Metadata } from "next";
+import { Suspense } from "react";
 
-export default function Page() {
+import { AdminSchedulePage } from "@/features/admin";
+
+export const metadata: Metadata = { title: "Ca làm và ngày nghỉ" };
+
+export default async function Page({ params }: { params: Promise<{ doctorId: string }> }) {
+  const id = Number((await params).doctorId);
   return (
-    <PagePlaceholder
-      sprint={5}
-      title="Ca làm và ngày nghỉ"
-      description="Lịch tuần, dry_run lịch bị ảnh hưởng (UC15)."
-    />
+    <Suspense>
+      <AdminSchedulePage doctorId={Number.isInteger(id) && id > 0 ? id : undefined} />
+    </Suspense>
   );
 }

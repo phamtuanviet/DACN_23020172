@@ -1,5 +1,14 @@
-import { PagePlaceholder } from "@/shared/ui/page-placeholder";
+import type { Metadata } from "next";
+import { Suspense } from "react";
+
+import { DoctorSchedulePage } from "@/features/doctor";
+
+export const metadata: Metadata = { title: "Lịch khám" };
 
 export default function Page() {
-  return <PagePlaceholder sprint={5} title="Lịch khám" description="Theo ngày và tuần (UC12)." />;
+  return (
+    <Suspense>
+      <DoctorSchedulePage />
+    </Suspense>
+  );
 }

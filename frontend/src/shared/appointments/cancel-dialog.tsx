@@ -1,5 +1,6 @@
 // Chỉ dùng trong client component. Hộp thoại hủy lịch (P-dialogs, UC07): lý do không bắt buộc,
 // nói rõ hủy rồi không khôi phục được. Lý do hủy là dữ liệu cá nhân, chỉ gửi lên backend.
+// Bệnh nhân và quản trị dùng chung; quản trị truyền danh sách lý do của phòng khám.
 import { useId, useState } from "react";
 
 import { errorMessage, toApiError } from "@/shared/api/errors";
@@ -21,10 +22,13 @@ export function CancelDialog({
   appointment,
   onClose,
   onCancelled,
+  reasons = T.cancelReasons,
 }: {
   appointment: Appointment;
   onClose: () => void;
   onCancelled: (appointment: Appointment) => void;
+  /** Lý do gợi ý; mục cuối luôn là "Lý do khác" để tự ghi. */
+  reasons?: readonly string[];
 }) {
   const otherId = useId();
   const [choice, setChoice] = useState("");
@@ -84,7 +88,7 @@ export function CancelDialog({
           className={cn(inputClass(), "font-normal")}
         >
           <option value="">{T.noReasonOption}</option>
-          {T.cancelReasons.map((reason) => (
+          {reasons.map((reason) => (
             <option key={reason} value={reason}>
               {reason}
             </option>

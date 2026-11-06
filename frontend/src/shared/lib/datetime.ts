@@ -1,6 +1,6 @@
 // Mọi ngày giờ hiển thị theo giờ phòng khám, bất kể múi giờ máy người dùng (docs mục 7.6).
 import { vi } from "date-fns/locale";
-import { formatInTimeZone } from "date-fns-tz";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 export const CLINIC_TZ = "Asia/Ho_Chi_Minh";
 
@@ -135,4 +135,30 @@ export function monthGrid(month: string): { leading: number; days: string[] } {
 /** Số ngày từ `from` tới `to` (cùng dạng "YYYY-MM-DD"). */
 export function daysBetween(from: string, to: string): number {
   return Math.round((parseDay(to).getTime() - parseDay(from).getTime()) / 86_400_000);
+}
+
+/** 1 = Thứ Hai … 7 = Chủ nhật, như `weekday` của ca làm. */
+export function isoWeekday(day: string): number {
+  return parseDay(day).getUTCDay() || 7;
+}
+
+/** Thứ Hai của tuần chứa `day`. */
+export function mondayOf(day: string): string {
+  return addDays(day, 1 - isoWeekday(day));
+}
+
+/** "19–25/10/2026", hoặc "28/09–04/10/2026" khi tuần sang tháng mới. */
+export function formatWeekRange(monday: string): string {
+  const sunday = addDays(monday, 6);
+  const [first, last] = [parseDay(monday), parseDay(sunday)];
+  const start =
+    first.getUTCMonth() === last.getUTCMonth()
+      ? String(first.getUTCDate()).padStart(2, "0")
+      : dayMonth(first);
+  return `${start}–${dayMonth(last)}/${last.getUTCFullYear()}`;
+}
+
+/** Ngày + giờ theo giờ phòng khám ("2026-10-21", "07:00") → thời điểm ISO để gửi API. */
+export function clinicDateTime(day: string, time: string): string {
+  return fromZonedTime(`${day}T${time}:00`, CLINIC_TZ).toISOString();
 }

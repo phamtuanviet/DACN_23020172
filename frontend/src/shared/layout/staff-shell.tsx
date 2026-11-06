@@ -1,19 +1,22 @@
 "use client";
 
 // Khung làm việc của bác sĩ và quản trị (D-day, AD-*): thanh bên màu tối từ 1024px; nhỏ hơn thì
-// thanh trên màu tối với nút mở menu dạng ngăn kéo.
+// thanh trên màu tối với nút mở menu dạng ngăn kéo. Mục Hàng chờ của quản trị kèm số việc đang chờ.
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, type ComponentType, type ReactNode } from "react";
 
+import { useQueueCount } from "@/shared/admin/queue";
 import { useAuthStore } from "@/shared/auth/auth-store";
 import { logout } from "@/shared/auth/session";
 import { cn } from "@/shared/lib/cn";
 import { TEXT } from "@/shared/texts";
 import {
+  CalendarIcon,
   CalendarPlusIcon,
   ChartIcon,
   CloseIcon,
+  FlagIcon,
   GridIcon,
   ListIcon,
   LogoutIcon,
@@ -23,25 +26,34 @@ import {
 import { Logo } from "@/shared/ui/logo";
 
 import { initials } from "./account-menu";
-import { isActive, STAFF_LINKS } from "./nav-links";
+import { isNavLinkActive, STAFF_LINKS } from "./nav-links";
 
+const QUEUE_HREF = "/admin/appointments?tab=queue";
 const ICONS: Record<string, ComponentType<{ size?: number }>> = {
   "/doctor/schedule": CalendarPlusIcon,
   "/admin/dashboard": ChartIcon,
   "/admin/appointments": ListIcon,
+  [QUEUE_HREF]: FlagIcon,
   "/admin/catalog": GridIcon,
   "/admin/doctors": UsersIcon,
+  "/admin/schedules": CalendarIcon,
 };
 
 export function StaffShell({ role, children }: { role: "DOCTOR" | "ADMIN"; children: ReactNode }) {
   const user = useAuthStore((state) => state.user);
   const pathname = usePathname();
+  const search = useSearchParams().toString();
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const area = role === "ADMIN" ? TEXT.staff.adminArea : TEXT.staff.doctorArea;
   const links = STAFF_LINKS[role];
-  const current = links.find((link) => isActive(pathname, link.href));
+  const isCurrent = (href: string) => {
+    const link = links.find((item) => item.href === href);
+    return link ? isNavLinkActive(link, pathname, search, links) : false;
+  };
+  const current = links.find((link) => isCurrent(link.href));
   const homeHref = links[0]?.href ?? "/";
+  const queueCount = useQueueCount(role === "ADMIN").data ?? 0;
 
   async function onLogout() {
     await logout();
@@ -52,7 +64,8 @@ export function StaffShell({ role, children }: { role: "DOCTOR" | "ADMIN"; child
     <nav aria-label={area} className="flex flex-1 flex-col gap-1">
       {links.map((link) => {
         const Icon = ICONS[link.href] ?? ListIcon;
-        const active = isActive(pathname, link.href);
+        const active = isCurrent(link.href);
+        const badge = link.href === QUEUE_HREF && queueCount > 0 ? queueCount : null;
         return (
           <Link
             key={link.href}
@@ -67,7 +80,15 @@ export function StaffShell({ role, children }: { role: "DOCTOR" | "ADMIN"; child
             )}
           >
             <Icon size={20} />
-            {link.label}
+            <span className="flex-1">{link.label}</span>
+            {badge !== null ? (
+              <span
+                aria-label={TEXT.staff.queueCount(badge)}
+                className="rounded-full bg-[#ffe3a8] px-2 text-[13px] leading-5 font-bold text-amber-ink"
+              >
+                {badge}
+              </span>
+            ) : null}
           </Link>
         );
       })}

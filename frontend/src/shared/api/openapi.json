@@ -909,6 +909,191 @@
         }
       }
     },
+    "/api/v1/admin/doctors": {
+      "get": {
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Admin List Doctors",
+        "description": "Mọi bác sĩ kể cả tài khoản đã khóa; tìm theo họ tên, email (UC14).",
+        "operationId": "admin_list_doctors_api_v1_admin_doctors_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Từ khóa, có dấu hoặc không dấu",
+              "title": "Q"
+            },
+            "description": "Từ khóa, có dấu hoặc không dấu"
+          },
+          {
+            "name": "specialty_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Specialty Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DoctorAdminOut"
+                  },
+                  "title": "Response Admin List Doctors Api V1 Admin Doctors Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Create Doctor",
+        "description": "Tạo tài khoản bác sĩ, gán chuyên khoa và dịch vụ (FR-ADM-01, FR-AUTH-05, FR-CAT-03).\nEmail đã có tài khoản: 409 EMAIL_TAKEN.",
+        "operationId": "create_doctor_api_v1_admin_doctors_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorAdminOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/doctors/{doctor_id}": {
+      "patch": {
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Update Doctor",
+        "description": "Sửa hồ sơ, gán lại dịch vụ (`service_ids`), khóa hoặc mở khóa (`is_active`). Khóa thì bác\nsĩ mất phiên đăng nhập ngay; lịch đã đặt giữ nguyên để quản trị xử lý (FR-ADM-01).",
+        "operationId": "update_doctor_api_v1_admin_doctors__doctor_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doctor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Doctor Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorAdminOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/availability": {
       "get": {
         "tags": [
@@ -1460,6 +1645,371 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AppointmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointments/{appointment_id}/note": {
+      "patch": {
+        "tags": [
+          "appointments"
+        ],
+        "summary": "Save Appointment Note",
+        "description": "Ghi chú sau khám, tối đa 1.000 ký tự; chỉ bác sĩ của lịch, khi bệnh nhân đã đến hoặc đã\nkhám (FR-DOC-03). Lỗi: FORBIDDEN (403), INVALID_TRANSITION (409).",
+        "operationId": "save_appointment_note_api_v1_appointments__appointment_id__note_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Appointment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/doctor/schedule": {
+      "get": {
+        "tags": [
+          "doctor"
+        ],
+        "summary": "Doctor Schedule",
+        "description": "Lịch khám của chính bác sĩ theo ngày hoặc tuần, kèm giờ làm và ngày nghỉ (FR-DOC-01).",
+        "operationId": "doctor_schedule_api_v1_doctor_schedule_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Ngày đầu, giờ Việt Nam",
+              "title": "Date From"
+            },
+            "description": "Ngày đầu, giờ Việt Nam"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Ngày cuối, tối đa 31 ngày",
+              "title": "Date To"
+            },
+            "description": "Ngày cuối, tối đa 31 ngày"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorScheduleOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/appointments": {
+      "get": {
+        "tags": [
+          "admin-appointments"
+        ],
+        "summary": "Admin List Appointments",
+        "description": "Mọi lịch hẹn, có lọc, xếp theo giờ khám (FR-ADM-03). `needs_attention=true` là hàng chờ\nlịch cần xử lý (FR-ADM-04). Đổi, hủy, đổi trạng thái dùng endpoint `/appointments/{id}/…`.",
+        "operationId": "admin_list_appointments_api_v1_admin_appointments_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Doctor Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AppointmentStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Channel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Channel"
+            }
+          },
+          {
+            "name": "needs_attention",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Needs Attention"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Mã lịch, họ tên, số điện thoại",
+              "title": "Q"
+            },
+            "description": "Mã lịch, họ tên, số điện thoại"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAppointmentPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/appointments/{appointment_id}/attention": {
+      "patch": {
+        "tags": [
+          "admin-appointments"
+        ],
+        "summary": "Set Appointment Attention",
+        "description": "Gỡ cờ \"cần xử lý\" (hoặc tự gắn cờ cho lịch Đã đặt) (FR-ADM-04).",
+        "operationId": "set_appointment_attention_api_v1_admin_appointments__appointment_id__attention_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Appointment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttentionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAppointmentOut"
                 }
               }
             }
@@ -2169,10 +2719,248 @@
           }
         }
       }
+    },
+    "/api/v1/admin/support-requests": {
+      "get": {
+        "tags": [
+          "admin-support"
+        ],
+        "summary": "List Support Requests",
+        "description": "Yêu cầu chuyển nhân viên từ trợ lý (UC11, UC16): đang mở cũ nhất trước.",
+        "operationId": "list_support_requests_api_v1_admin_support_requests_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SupportStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SupportRequestAdminOut"
+                  },
+                  "title": "Response List Support Requests Api V1 Admin Support Requests Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/support-requests/{request_id}": {
+      "patch": {
+        "tags": [
+          "admin-support"
+        ],
+        "summary": "Update Support Request",
+        "description": "Đánh dấu đã xử lý hoặc mở lại (FR-ADM-04).",
+        "operationId": "update_support_request_api_v1_admin_support_requests__request_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupportRequestUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportRequestAdminOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AdminAppointmentOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Mã lịch hẹn LH-YYMMDD-XXXX"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AppointmentStatus"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
+          "service": {
+            "$ref": "#/components/schemas/ServiceRef"
+          },
+          "doctor": {
+            "$ref": "#/components/schemas/DoctorRef"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "can_change": {
+            "type": "boolean",
+            "title": "Can Change",
+            "description": "Người gọi còn đổi, hủy được không (BR-08)"
+          },
+          "change_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Until",
+            "description": "Hạn đổi, hủy trực tuyến của bệnh nhân (giờ khám − 2 giờ); rỗng khi không còn là lịch Đã đặt"
+          },
+          "patient": {
+            "$ref": "#/components/schemas/PatientContact"
+          },
+          "needs_attention": {
+            "type": "boolean",
+            "title": "Needs Attention"
+          },
+          "attention_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AttentionSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nguồn của lần gắn cờ gần nhất; rỗng khi chưa từng gắn cờ"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "status",
+          "channel",
+          "service",
+          "doctor",
+          "start_at",
+          "end_at",
+          "can_change",
+          "change_until",
+          "patient",
+          "needs_attention",
+          "attention_source"
+        ],
+        "title": "AdminAppointmentOut"
+      },
+      "AdminAppointmentPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminAppointmentOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "AdminAppointmentPage"
+      },
       "AffectedOut": {
         "properties": {
           "id": {
@@ -2346,6 +3134,14 @@
             },
             "type": "array",
             "title": "History"
+          },
+          "previous_visits": {
+            "items": {
+              "$ref": "#/components/schemas/PastVisit"
+            },
+            "type": "array",
+            "title": "Previous Visits",
+            "description": "Chỉ khi bác sĩ của lịch xem: các lần khám trước của bệnh nhân với chính bác sĩ đó, mới nhất trước; người khác nhận danh sách rỗng"
           }
         },
         "type": "object",
@@ -2366,7 +3162,8 @@
           "needs_attention",
           "patient",
           "created_at",
-          "history"
+          "history",
+          "previous_visits"
         ],
         "title": "AppointmentDetail"
       },
@@ -2478,6 +3275,31 @@
           "NO_SHOW"
         ],
         "title": "AppointmentStatus"
+      },
+      "AttentionRequest": {
+        "properties": {
+          "needs_attention": {
+            "type": "boolean",
+            "title": "Needs Attention"
+          }
+        },
+        "type": "object",
+        "required": [
+          "needs_attention"
+        ],
+        "title": "AttentionRequest",
+        "description": "Gỡ cờ \"cần xử lý\" sau khi đã liên hệ bệnh nhân, hoặc tự gắn cờ cho lịch Đã đặt\n(FR-ADM-04)."
+      },
+      "AttentionSource": {
+        "type": "string",
+        "enum": [
+          "TIME_OFF",
+          "SHIFT_CHANGE",
+          "SHIFT_DELETE",
+          "MANUAL"
+        ],
+        "title": "AttentionSource",
+        "description": "Vì sao lịch bị gắn cờ: ngày nghỉ, sửa hoặc xóa ca (BR-10), hoặc quản trị tự gắn."
       },
       "AvailabilityOut": {
         "properties": {
@@ -2821,6 +3643,149 @@
         ],
         "title": "DayStatus"
       },
+      "DoctorAdminOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Họ tên kèm chức danh, như trang công khai hiển thị"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "full_name": {
+            "type": "string",
+            "title": "Full Name",
+            "description": "Họ tên không kèm chức danh"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "gender": {
+            "$ref": "#/components/schemas/Gender"
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
+          "specialty": {
+            "$ref": "#/components/schemas/SpecialtyRef"
+          },
+          "service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Service Ids",
+            "description": "Dịch vụ bác sĩ thực hiện, kể cả dịch vụ đã ẩn"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "description": "false: tài khoản bị khóa, không đăng nhập, không nhận lịch"
+          },
+          "upcoming_count": {
+            "type": "integer",
+            "title": "Upcoming Count",
+            "description": "Số lịch Đã đặt sắp tới, để cảnh báo trước khi khóa"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "title",
+          "full_name",
+          "email",
+          "gender",
+          "bio",
+          "specialty",
+          "service_ids",
+          "is_active",
+          "upcoming_count"
+        ],
+        "title": "DoctorAdminOut",
+        "description": "Bác sĩ trong trang quản trị, kể cả tài khoản đã khóa (FR-ADM-01, FR-CAT-03)."
+      },
+      "DoctorCreate": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "title": "Password"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 50,
+            "title": "Title"
+          },
+          "full_name": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Full Name"
+          },
+          "gender": {
+            "$ref": "#/components/schemas/Gender"
+          },
+          "specialty_id": {
+            "type": "integer",
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
+            "title": "Specialty Id"
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
+          "service_ids": {
+            "items": {
+              "type": "integer",
+              "maximum": 9.223372036854776e+18,
+              "minimum": 1.0
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Service Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password",
+          "title",
+          "full_name",
+          "gender",
+          "specialty_id"
+        ],
+        "title": "DoctorCreate",
+        "description": "Tài khoản bác sĩ chỉ do quản trị tạo (FR-AUTH-05). Dịch vụ phải thuộc chuyên khoa của bác\nsĩ; mật khẩu ban đầu theo cùng quy tắc với đăng ký."
+      },
       "DoctorDetail": {
         "properties": {
           "id": {
@@ -2939,6 +3904,156 @@
           "name"
         ],
         "title": "DoctorRef"
+      },
+      "DoctorScheduleOut": {
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "format": "date",
+            "title": "Date From"
+          },
+          "date_to": {
+            "type": "string",
+            "format": "date",
+            "title": "Date To"
+          },
+          "appointments": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleAppointment"
+            },
+            "type": "array",
+            "title": "Appointments"
+          },
+          "work": {
+            "items": {
+              "$ref": "#/components/schemas/TimeBlock"
+            },
+            "type": "array",
+            "title": "Work",
+            "description": "Giờ làm từng ngày, trải từ ca làm lặp hằng tuần"
+          },
+          "time_offs": {
+            "items": {
+              "$ref": "#/components/schemas/TimeOffBlock"
+            },
+            "type": "array",
+            "title": "Time Offs",
+            "description": "Ngày nghỉ chồng khoảng đang xem"
+          },
+          "upcoming_time_offs": {
+            "items": {
+              "$ref": "#/components/schemas/TimeOffBlock"
+            },
+            "type": "array",
+            "title": "Upcoming Time Offs",
+            "description": "Tối đa 3 ngày nghỉ sắp tới"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date_from",
+          "date_to",
+          "appointments",
+          "work",
+          "time_offs",
+          "upcoming_time_offs"
+        ],
+        "title": "DoctorScheduleOut",
+        "description": "Lịch khám theo ngày hoặc tuần (FR-DOC-01, UC12): lịch ở mọi trạng thái, giờ làm theo ca,\nngày nghỉ."
+      },
+      "DoctorUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Gender"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "specialty_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialty Id"
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
+          "service_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer",
+                  "maximum": 9.223372036854776e+18,
+                  "minimum": 1.0
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Ids"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "DoctorUpdate",
+        "description": "Chỉ trường được gửi mới đổi; email không đổi được. `is_active = false` là khóa tài khoản.\n\nĐổi chuyên khoa mà không gửi `service_ids` thì bỏ các dịch vụ không thuộc chuyên khoa mới."
       },
       "EarliestItem": {
         "properties": {
@@ -3226,6 +4341,69 @@
         ],
         "title": "MeResponse"
       },
+      "NoteRequest": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Bệnh nhân xem được ghi chú này"
+          }
+        },
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "title": "NoteRequest",
+        "description": "Ghi chú sau khám, tối đa 1.000 ký tự; gửi rỗng hoặc null để xóa (FR-DOC-03). Trường bắt\nbuộc: body thiếu `note` (gõ sai tên trường) bị từ chối thay vì âm thầm xóa ghi chú."
+      },
+      "PastVisit": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "service": {
+            "$ref": "#/components/schemas/ServiceRef"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AppointmentStatus"
+          },
+          "doctor_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "start_at",
+          "service",
+          "status",
+          "doctor_note"
+        ],
+        "title": "PastVisit",
+        "description": "Lần khám trước của cùng bệnh nhân với chính bác sĩ đang xem (D-detail)."
+      },
       "PatientBrief": {
         "properties": {
           "id": {
@@ -3257,6 +4435,42 @@
         ],
         "title": "PatientBrief",
         "description": "Bác sĩ chỉ thấy họ tên và tuổi, không thấy email, số điện thoại (docs mục 4.6)."
+      },
+      "PatientContact": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "phone",
+          "email"
+        ],
+        "title": "PatientContact",
+        "description": "Quản trị thấy đủ thông tin liên hệ của bệnh nhân (docs mục 4.6)."
       },
       "ProposalDisplay": {
         "properties": {
@@ -3489,6 +4703,70 @@
         ],
         "title": "RescheduleRequest",
         "description": "Đổi lịch giữ nguyên dịch vụ và mã lịch (UC06).\n\n`doctor_id` bắt buộc, kể cả khi giữ bác sĩ cũ: khung giờ người dùng chọn thuộc lưới của đúng\nbác sĩ đó, và service khóa bác sĩ này trước khi khóa lịch hẹn (docs mục 5.4)."
+      },
+      "ScheduleAppointment": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AppointmentStatus"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
+          "service": {
+            "$ref": "#/components/schemas/ServiceRef"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "patient": {
+            "$ref": "#/components/schemas/PatientBrief"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "has_note": {
+            "type": "boolean",
+            "title": "Has Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "status",
+          "channel",
+          "service",
+          "start_at",
+          "end_at",
+          "patient",
+          "reason",
+          "has_note"
+        ],
+        "title": "ScheduleAppointment",
+        "description": "Một lịch trong lịch khám của bác sĩ: không có email, số điện thoại (docs mục 4.6)."
       },
       "Scope": {
         "type": "string",
@@ -4307,6 +5585,180 @@
         ],
         "title": "StatusChangeRequest",
         "description": "Hủy lịch đi qua `/cancel` để có lý do và email; endpoint này chỉ dành cho buổi khám."
+      },
+      "SupportPatient": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "phone",
+          "email"
+        ],
+        "title": "SupportPatient",
+        "description": "Quản trị cần đủ thông tin để gọi lại bệnh nhân (docs mục 4.6)."
+      },
+      "SupportRequestAdminOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SupportStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "patient": {
+            "$ref": "#/components/schemas/SupportPatient"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "Tóm tắt hội thoại do trợ lý viết"
+          },
+          "handled_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handled By",
+            "description": "Quản trị đã xử lý"
+          },
+          "handled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handled At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "created_at",
+          "patient",
+          "summary",
+          "handled_by",
+          "handled_at"
+        ],
+        "title": "SupportRequestAdminOut",
+        "description": "Một yêu cầu trong hàng chờ của quản trị (FR-ADM-04)."
+      },
+      "SupportRequestUpdate": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "DONE",
+              "OPEN"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "SupportRequestUpdate",
+        "description": "Đánh dấu đã xử lý; gửi OPEN để mở lại nếu đánh dấu nhầm."
+      },
+      "SupportStatus": {
+        "type": "string",
+        "enum": [
+          "OPEN",
+          "DONE"
+        ],
+        "title": "SupportStatus"
+      },
+      "TimeBlock": {
+        "properties": {
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_at",
+          "end_at"
+        ],
+        "title": "TimeBlock"
+      },
+      "TimeOffBlock": {
+        "properties": {
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_at",
+          "end_at",
+          "reason"
+        ],
+        "title": "TimeOffBlock"
       },
       "TimeOffChangeOut": {
         "properties": {

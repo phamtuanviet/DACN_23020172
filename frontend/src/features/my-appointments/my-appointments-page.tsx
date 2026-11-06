@@ -8,7 +8,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import type { Appointment, AppointmentScope, AppointmentStatus } from "@/shared/api/types";
+import { CancelDialog } from "@/shared/appointments/cancel-dialog";
 import { useMyAppointmentList } from "@/shared/appointments/queries";
+import { RescheduleDialog } from "@/shared/appointments/reschedule-dialog";
 import { cn } from "@/shared/lib/cn";
 import { dayBadge, formatTimeRange } from "@/shared/lib/datetime";
 import { CLINIC, TEXT } from "@/shared/texts";
@@ -19,8 +21,6 @@ import { inputClass } from "@/shared/ui/field";
 import { CalendarPlusIcon, InfoIcon } from "@/shared/ui/icons";
 
 import { AppointmentDetail } from "./appointment-detail";
-import { CancelDialog } from "./cancel-dialog";
-import { RescheduleDialog } from "./reschedule-dialog";
 
 const T = TEXT.appointments;
 const ACTIVE_LIMIT = 3; // BR-09

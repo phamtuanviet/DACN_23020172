@@ -39,6 +39,13 @@ describe("describeHistory", () => {
     expect(describeHistory(entry({ action: "FLAG", by_me: false, actor_role: null }))).toBe(
       "Hệ thống đánh dấu cần xử lý",
     );
+    const unflag = entry({
+      action: "FLAG",
+      actor_role: "ADMIN",
+      old: { needs_attention: true },
+      new: { needs_attention: false },
+    });
+    expect(describeHistory(unflag)).toBe("Bạn gỡ cờ cần xử lý");
   });
 
   it("đổi giờ trong ngày chỉ ghi giờ; khác ngày ghi cả ngày; đổi bác sĩ ghi tên", () => {

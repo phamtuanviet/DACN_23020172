@@ -1,11 +1,9 @@
-import { PagePlaceholder } from "@/shared/ui/page-placeholder";
+import type { Metadata } from "next";
+
+import { AdminDoctorsPage } from "@/features/admin";
+
+export const metadata: Metadata = { title: "Bác sĩ" };
 
 export default function Page() {
-  return (
-    <PagePlaceholder
-      sprint={5}
-      title="Bác sĩ"
-      description="Tài khoản bác sĩ, gán dịch vụ (UC14)."
-    />
-  );
+  return <AdminDoctorsPage />;
 }

@@ -6,11 +6,19 @@ import { TEXT } from "@/shared/texts";
 
 import { AlertIcon } from "./icons";
 
-export const inputClass = (invalid?: boolean) =>
+// `cn` chỉ nối chuỗi, không gộp class trùng thuộc tính, nên kích thước chọn bằng tham số thay vì
+// ghi đè chiều cao: "md" ô nhập trong form, "sm" bộ lọc gọn, "multiline" textarea tự cao theo `rows`.
+export type InputSize = "md" | "sm" | "multiline";
+
+export const inputClass = (invalid?: boolean, size: InputSize = "md") =>
   cn(
-    "h-12 w-full rounded-control border bg-surface px-3.5 text-base text-ink transition-colors",
+    "w-full rounded-control border bg-surface text-ink transition-colors",
+    size === "md" && "h-12 px-3.5 text-base",
+    size === "sm" && "h-10 px-2.5 text-sm",
+    size === "multiline" && "px-3.5 py-2.5 text-base",
+    "disabled:bg-ground",
     "focus:border-primary focus:ring-3 focus:ring-primary/15 focus:outline-none",
-    invalid ? "border-danger border-[1.5px]" : "border-line-strong",
+    invalid ? "border-[1.5px] border-danger" : "border-line-strong",
   );
 
 type FieldProps = {

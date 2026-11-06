@@ -1,6 +1,7 @@
 // Chỉ dùng trong client component. Hộp thoại đổi lịch (P-dialogs, UC06): cùng dịch vụ, mặc định
 // cùng bác sĩ, chọn được bác sĩ khác; so sánh lịch cũ → mới trước khi xác nhận. Khung vừa bị đặt
-// thì lịch cũ giữ nguyên (AC-04) và danh sách giờ trống tải lại.
+// thì lịch cũ giữ nguyên (AC-04) và danh sách giờ trống tải lại. Bệnh nhân (Lịch của tôi) và quản
+// trị (hàng chờ, FR-ADM-03) dùng chung; backend tự bỏ mốc 2 giờ khi người đổi là quản trị.
 import { useState } from "react";
 
 import { errorMessage, toApiError } from "@/shared/api/errors";

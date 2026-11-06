@@ -49,7 +49,7 @@ export function describeHistory(entry: HistoryEntry): string {
     case "NOTE_UPDATE":
       return T.changes.note(who);
     case "FLAG":
-      return T.changes.flag(who);
+      return next?.needs_attention === false ? T.changes.unflag(who) : T.changes.flag(who);
   }
 }
 

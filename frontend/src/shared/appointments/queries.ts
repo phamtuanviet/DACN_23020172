@@ -53,11 +53,14 @@ export function useAppointment(id: number | undefined) {
   });
 }
 
-/** Lịch hẹn và khung trống cùng đổi sau mỗi thao tác ghi. */
+/** Lịch hẹn và khung trống cùng đổi sau mỗi thao tác ghi; hộp thoại đổi, hủy dùng chung cho cả
+ *  quản trị nên làm mới luôn danh sách, hàng chờ của quản trị và lịch khám của bác sĩ. */
 export function refreshAfterChange(client: QueryClient): Promise<unknown> {
   return Promise.all([
     client.invalidateQueries({ queryKey: ["appointments"] }),
     client.invalidateQueries({ queryKey: ["availability"] }),
+    client.invalidateQueries({ queryKey: ["admin"] }),
+    client.invalidateQueries({ queryKey: ["doctor"] }),
   ]);
 }
 

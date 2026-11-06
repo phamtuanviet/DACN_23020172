@@ -16,8 +16,9 @@ src/
 ├── features/<tên>/      giao diện + logic của một tính năng; bên ngoài chỉ dùng qua index.ts
 ├── shared/
 │   ├── api/               client.ts (trình duyệt), server.ts (server component), schema.d.ts (sinh tự động)
+│   ├── admin/             số việc trong hàng chờ của quản trị (thanh bên và tab Hàng chờ cùng dùng)
 │   ├── agent/             khung chat đang mở hay đóng, nút "Hỏi trợ lý" (mọi trang mở được khung chat)
-│   ├── appointments/      hook lịch hẹn dùng chung booking và my-appointments
+│   ├── appointments/      hook lịch hẹn, hộp thoại đổi, hủy lịch dùng chung bệnh nhân và quản trị
 │   ├── auth/  availability/  config/  lib/  layout/  ui/
 └── proxy.ts             Content-Security-Policy có nonce
 ```
