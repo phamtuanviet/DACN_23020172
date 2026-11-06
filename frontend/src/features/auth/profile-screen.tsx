@@ -98,6 +98,35 @@ export function ProfileScreen() {
   );
 }
 
+/** Tài khoản của bác sĩ, quản trị: tài khoản do quản trị cấp nên chỉ xem họ tên, email và đổi
+ *  mật khẩu ban đầu (FR-AUTH-06); họ tên, chức danh do quản trị sửa ở trang Bác sĩ. */
+export function StaffAccountScreen() {
+  const user = useAuthStore((state) => state.user);
+  const area = user?.role === "ADMIN" ? TEXT.staff.adminArea : TEXT.staff.doctorArea;
+  return (
+    <main className="mx-auto flex w-full max-w-[1280px] flex-col gap-4 px-4 py-6 md:px-7">
+      <h1 className="text-2xl font-semibold md:text-[26px] md:leading-[34px]">{P.title}</h1>
+      <div className="flex max-w-[760px] flex-col gap-5">
+        {user ? (
+          <section className="flex flex-col gap-3 rounded-card border border-line bg-surface p-5 md:p-6">
+            <h2 className="text-lg font-semibold">{P.info}</h2>
+            <dl className="grid grid-cols-[120px_minmax(0,1fr)] gap-x-3 gap-y-2 md:grid-cols-[140px_minmax(0,1fr)]">
+              <dt className="text-muted">{T.fullName}</dt>
+              <dd className="font-semibold">{user.full_name}</dd>
+              <dt className="text-muted">{P.loginEmail}</dt>
+              <dd className="break-all">{user.email}</dd>
+              <dt className="text-muted">{P.role}</dt>
+              <dd>{area}</dd>
+            </dl>
+            <p className="text-sm text-muted">{P.staffNote}</p>
+          </section>
+        ) : null}
+        <PasswordForm />
+      </div>
+    </main>
+  );
+}
+
 function ProfileForm({ user }: { user: Me }) {
   const setUser = useAuthStore((state) => state.setUser);
   const [formError, setFormError] = useState<string | null>(null);

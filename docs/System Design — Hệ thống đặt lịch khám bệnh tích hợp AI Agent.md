@@ -935,8 +935,8 @@ frontend/
 │   │   ├── (public)/         # page.tsx (trang chủ) · services/ · doctors/[id]/ — server component
 │   │   ├── (auth)/           # login/ · register/
 │   │   ├── (patient)/        # booking/ · me/appointments/ · me/profile/ — layout có guard PATIENT
-│   │   ├── doctor/           # schedule/ · appointments/[id]/ — layout có guard DOCTOR
-│   │   ├── admin/            # catalog/ · doctors/ · schedules/ · schedules/[doctorId]/ · appointments/ · dashboard/
+│   │   ├── doctor/           # schedule/ · appointments/[id]/ · account/ — layout có guard DOCTOR
+│   │   ├── admin/            # catalog/ · doctors/ · schedules/ · schedules/[doctorId]/ · appointments/ · dashboard/ · account/
 │   │   ├── healthz/route.ts  # health check cho Caddy và Docker
 │   │   └── not-found.tsx · error.tsx
 │   ├── shared/

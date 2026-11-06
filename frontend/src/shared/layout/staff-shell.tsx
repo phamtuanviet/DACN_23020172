@@ -103,10 +103,15 @@ export function StaffShell({ role, children }: { role: "DOCTOR" | "ADMIN"; child
       >
         {initials(user.full_name)}
       </span>
-      <span className="min-w-0 flex-1">
+      <Link
+        href={role === "ADMIN" ? "/admin/account" : "/doctor/account"}
+        title={TEXT.profile.openAccount}
+        onClick={() => setDrawerOpen(false)}
+        className="min-w-0 flex-1 rounded-control hover:bg-white/6"
+      >
         <span className="block truncate text-sm font-semibold text-white">{user.full_name}</span>
         <span className="block text-xs text-[#9fb0b4]">{area}</span>
-      </span>
+      </Link>
       <button
         type="button"
         onClick={onLogout}

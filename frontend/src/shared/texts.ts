@@ -875,6 +875,10 @@ export const TEXT = {
     logout: "Đăng xuất",
     loginEmail: "Email đăng nhập",
     emailHint: "Không đổi được email trên web. Liên hệ phòng khám nếu cần.",
+    role: "Vai trò",
+    staffNote:
+      "Họ tên và chức danh do quản trị cập nhật. Nếu vẫn dùng mật khẩu quản trị cấp lúc tạo tài khoản, hãy đổi ngay bên dưới.",
+    openAccount: "Mở trang tài khoản",
     save: "Lưu thay đổi",
     saving: "Đang lưu…",
     saved: "Đã lưu thông tin cá nhân",
