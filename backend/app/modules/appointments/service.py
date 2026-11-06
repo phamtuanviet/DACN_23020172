@@ -7,7 +7,7 @@ chặn cuối cùng chống trùng lịch (BR-01, BR-03, BR-04).
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Any
 
 import structlog
@@ -19,25 +19,36 @@ from app.core.clock import Clock
 from app.core.config import Settings
 from app.core.db import transaction
 from app.core.errors import AppError, field_error, forbidden, not_found, violated_constraint
-from app.core.timeutil import to_local
-from app.db.enums import AppointmentStatus, HistoryAction, NotificationType, UserRole
+from app.core.timeutil import local_datetime, to_local
+from app.db.enums import AppointmentStatus, Channel, HistoryAction, NotificationType, UserRole
 from app.db.models.appointments import Appointment, AppointmentHistory
 from app.modules.appointments import policy
 from app.modules.appointments import repository as repo
 from app.modules.appointments.codes import new_appointment_code
 from app.modules.appointments.schemas import (
+    AdminAppointmentOut,
+    AdminAppointmentPage,
     AppointmentDetail,
     AppointmentOut,
     AppointmentPage,
+    AttentionRequest,
+    AttentionSource,
     BookRequest,
     CancelRequest,
+    DoctorScheduleOut,
     HistoryEntry,
     HistoryState,
+    NoteRequest,
+    PastVisit,
     PatientBrief,
+    PatientContact,
     RescheduleRequest,
+    ScheduleAppointment,
     Scope,
     ServiceRef,
     StatusChangeRequest,
+    TimeBlock,
+    TimeOffBlock,
 )
 from app.modules.catalog.schemas import DoctorRef
 from app.modules.catalog.service import (
@@ -47,9 +58,11 @@ from app.modules.catalog.service import (
     service_exists,
 )
 from app.modules.notifications import outbox
+from app.modules.scheduling.repository import TimeOffRow
 from app.modules.scheduling.service import (
     BookingWindow,
     Candidate,
+    doctor_calendar,
     doctor_service_mismatch,
     ensure_slot_bookable,
     service_not_found,
@@ -63,6 +76,8 @@ CODE_UNIQUE = "uq_appointments_code"
 DOCTOR_OVERLAP = "excl_doctor_overlap"
 PATIENT_OVERLAP = "excl_patient_overlap"
 MAX_PAGE_SIZE = 100  # docs mục 8.1
+MAX_SCHEDULE_DAYS = 31  # lịch khám của bác sĩ: tối đa một tháng mỗi lần xem
+PREVIOUS_VISITS = 5
 
 
 # ---------------------------------------------------------------------------- lỗi
@@ -144,6 +159,7 @@ async def flag_for_attention(
     appointments: Sequence[AffectedAppointment],
     *,
     source: dict[str, Any],
+    now: datetime,
 ) -> list[int]:
     """Gắn cờ "cần xử lý" và ghi history FLAG (BR-10). Không bao giờ tự hủy lịch.
 
@@ -170,6 +186,7 @@ async def flag_for_attention(
                 action=HistoryAction.FLAG,
                 old_value={"needs_attention": False},
                 new_value={"needs_attention": True, **source},
+                created_at=now,
             )
         )
         flagged.append(appointment.id)
@@ -197,6 +214,26 @@ def _age(birthday: date | None, today: date) -> int | None:
     if birthday is None:
         return None
     return today.year - birthday.year - ((today.month, today.day) < (birthday.month, birthday.day))
+
+
+def _time_off_block(item: TimeOffRow) -> TimeOffBlock:
+    return TimeOffBlock(
+        start_at=to_local(item.start_at), end_at=to_local(item.end_at), reason=item.reason
+    )
+
+
+def _attention_source(value: str | None) -> AttentionSource | None:
+    try:
+        return AttentionSource(value) if value else None
+    except ValueError:
+        return None
+
+
+def _check_page(page: int, page_size: int) -> None:
+    if page < 1:
+        raise field_error("page", "Trang bắt đầu từ 1.", location="query")
+    if not 1 <= page_size <= MAX_PAGE_SIZE:
+        raise field_error("page_size", "Mỗi trang 1–100 lịch.", location="query")
 
 
 def _history_state(value: dict[str, Any] | None, doctors: dict[int, str]) -> HistoryState | None:
@@ -281,10 +318,7 @@ class AppointmentService:
     ) -> AppointmentPage:
         """Lịch sắp tới và lịch sử của chính bệnh nhân, lọc theo trạng thái (UC08, FR-APT-04)."""
         patient_id = policy.ensure_can_list_own(actor)
-        if page < 1:
-            raise field_error("page", "Trang bắt đầu từ 1.", location="query")
-        if not 1 <= page_size <= MAX_PAGE_SIZE:
-            raise field_error("page_size", "Mỗi trang 1–100 lịch.", location="query")
+        _check_page(page, page_size)
         now = self._clock.now()
         async with self._session.begin():
             rows, total = await repo.list_for_patient(
@@ -327,6 +361,15 @@ class AppointmentService:
             roles = await repo.roles_of(
                 self._session, sorted({e.actor_id for e in entries if e.actor_id is not None})
             )
+            visits: list[tuple[Appointment, str]] = []
+            if actor.role is UserRole.DOCTOR:  # ensure_can_view: chính là bác sĩ của lịch
+                visits = await repo.previous_visits(
+                    self._session,
+                    patient_id=row.appointment.patient_id,
+                    doctor_id=row.appointment.doctor_id,
+                    before=row.appointment.start_at,
+                    limit=PREVIOUS_VISITS,
+                )
         appointment = row.appointment
         base = self._out(appointment, row.service_name, row.doctor_name, actor, now)
         return AppointmentDetail(
@@ -354,7 +397,183 @@ class AppointmentService:
                 )
                 for e in entries
             ],
+            previous_visits=[
+                PastVisit(
+                    id=visit.id,
+                    start_at=to_local(visit.start_at),
+                    service=ServiceRef(id=visit.service_id, name=service_name),
+                    status=visit.status,
+                    doctor_note=visit.doctor_note,
+                )
+                for visit, service_name in visits
+            ],
         )
+
+    # ------------------------------------------------------------ bác sĩ (UC12, UC18)
+    async def doctor_schedule(
+        self, actor: Actor, date_from: date, date_to: date
+    ) -> DoctorScheduleOut:
+        """Lịch khám của chính bác sĩ theo ngày hoặc tuần (FR-DOC-01, AC-09): họ tên, tuổi, dịch
+        vụ, giờ, lý do khám; không có email, số điện thoại (docs mục 4.6)."""
+        doctor_id = policy.ensure_is_doctor(actor)
+        if date_to < date_from:
+            raise field_error(
+                "date_to", "Ngày kết thúc không được trước ngày bắt đầu.", location="query"
+            )
+        if (date_to - date_from).days >= MAX_SCHEDULE_DAYS:
+            raise field_error(
+                "date_to", f"Xem tối đa {MAX_SCHEDULE_DAYS} ngày mỗi lần.", location="query"
+            )
+        now = self._clock.now()
+        today = to_local(now).date()
+        start = local_datetime(date_from, time(0))
+        end = local_datetime(date_to + timedelta(days=1), time(0))
+        async with self._session.begin():
+            rows = await repo.list_for_doctor(self._session, doctor_id, start, end)
+            calendar = await doctor_calendar(
+                self._session, actor, doctor_id, date_from, date_to, now
+            )
+        return DoctorScheduleOut(
+            date_from=date_from,
+            date_to=date_to,
+            appointments=[
+                ScheduleAppointment(
+                    id=row.appointment.id,
+                    code=row.appointment.code,
+                    status=row.appointment.status,
+                    channel=row.appointment.channel,
+                    service=ServiceRef(id=row.appointment.service_id, name=row.service_name),
+                    start_at=to_local(row.appointment.start_at),
+                    end_at=to_local(row.appointment.end_at),
+                    patient=PatientBrief(
+                        id=row.appointment.patient_id,
+                        name=row.patient_name,
+                        age=_age(row.patient_birthday, today),
+                    ),
+                    reason=row.appointment.reason,
+                    has_note=row.appointment.doctor_note is not None,
+                )
+                for row in rows
+            ],
+            work=[
+                TimeBlock(start_at=to_local(item.start), end_at=to_local(item.end))
+                for item in calendar.work
+            ],
+            time_offs=[_time_off_block(item) for item in calendar.time_offs],
+            upcoming_time_offs=[_time_off_block(item) for item in calendar.upcoming_time_offs],
+        )
+
+    async def save_note(
+        self, actor: Actor, appointment_id: int, data: NoteRequest
+    ) -> AppointmentDetail:
+        """Ghi chú sau khám, tối đa 1.000 ký tự (UC18, FR-DOC-03); bệnh nhân xem được.
+
+        Ghi chú là dữ liệu sức khỏe: không vào log; lịch sử chỉ ghi "đã cập nhật ghi chú".
+        """
+        now = self._clock.now()
+        changed = False
+        async with self._session.begin():
+            current = await repo.get_appointment(self._session, appointment_id)
+            if current is None:
+                raise appointment_not_found()
+            policy.ensure_can_write_note(current, actor)
+            appointment = await repo.lock_appointment(self._session, appointment_id)
+            if appointment is None:
+                raise appointment_not_found()
+            policy.ensure_can_write_note(appointment, actor)
+            if appointment.doctor_note != data.note:
+                old = history_value(appointment)
+                appointment.doctor_note = data.note
+                await self._session.flush()
+                self._record(appointment, actor, HistoryAction.NOTE_UPDATE, old, now)
+                changed = True
+        if changed:
+            log.info("appointment.note_saved", appointment_id=appointment_id)
+        return await self.get(actor, appointment_id)
+
+    # ------------------------------------------------------------ quản trị (UC16)
+    async def list_for_admin(
+        self,
+        actor: Actor,
+        *,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        doctor_id: int | None = None,
+        status: AppointmentStatus | None = None,
+        channel: Channel | None = None,
+        needs_attention: bool | None = None,
+        q: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> AdminAppointmentPage:
+        """Mọi lịch hẹn, lọc theo ngày, bác sĩ, trạng thái, kênh, cờ cần xử lý (FR-ADM-03, 04);
+        tìm theo mã lịch, họ tên hoặc số điện thoại bệnh nhân."""
+        policy.ensure_admin(actor)
+        _check_page(page, page_size)
+        if date_from is not None and date_to is not None and date_to < date_from:
+            raise field_error(
+                "date_to", "Ngày kết thúc không được trước ngày bắt đầu.", location="query"
+            )
+        query = repo.AdminFilter(
+            start=local_datetime(date_from, time(0)) if date_from else None,
+            end=local_datetime(date_to + timedelta(days=1), time(0)) if date_to else None,
+            doctor_id=doctor_id,
+            status=status,
+            channel=channel,
+            needs_attention=needs_attention,
+            q=q.strip() if q and q.strip() else None,
+        )
+        now = self._clock.now()
+        async with self._session.begin():
+            rows, total = await repo.list_for_admin(
+                self._session, query, offset=(page - 1) * page_size, limit=page_size
+            )
+        return AdminAppointmentPage(
+            items=[self._admin_out(row, actor, now) for row in rows],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
+
+    async def set_attention(
+        self, actor: Actor, appointment_id: int, data: AttentionRequest
+    ) -> AdminAppointmentOut:
+        """Gỡ cờ "cần xử lý" sau khi đã liên hệ bệnh nhân, hoặc tự gắn cờ (FR-ADM-04). Mỗi lần
+        đổi ghi một dòng history FLAG, chỉ quản trị thấy (docs mục 5.7)."""
+        policy.ensure_admin(actor)
+        now = self._clock.now()
+        async with self._session.begin():
+            appointment = await repo.lock_appointment(self._session, appointment_id)
+            if appointment is None:
+                raise appointment_not_found()
+            wanted = data.needs_attention
+            if wanted and appointment.status is not AppointmentStatus.BOOKED:
+                raise policy.invalid_transition(
+                    "Chỉ gắn cờ cần xử lý cho lịch hẹn Đã đặt.", appointment.status
+                )
+            if appointment.needs_attention != wanted:
+                appointment.needs_attention = wanted
+                await self._session.flush()
+                self._session.add(
+                    AppointmentHistory(
+                        appointment_id=appointment.id,
+                        actor_id=actor.user_id,
+                        channel=actor.channel,
+                        action=HistoryAction.FLAG,
+                        old_value={"needs_attention": not wanted},
+                        new_value={"needs_attention": wanted}
+                        | ({"source": AttentionSource.MANUAL.value} if wanted else {}),
+                        created_at=now,
+                    )
+                )
+            rows, _ = await repo.list_for_admin(
+                self._session,
+                repo.AdminFilter(appointment_id=appointment_id),
+                offset=0,
+                limit=1,
+            )
+        log.info("appointment.attention_set", appointment_id=appointment_id, value=wanted)
+        return self._admin_out(rows[0], actor, now)
 
     # ------------------------------------------------------------ đổi, hủy
     async def reschedule(
@@ -691,6 +910,21 @@ class AppointmentService:
                 new_value=history_value(appointment),
                 created_at=now,
             )
+        )
+
+    def _admin_out(self, row: repo.AdminRow, actor: Actor, now: datetime) -> AdminAppointmentOut:
+        appointment = row.appointment
+        base = self._out(appointment, row.service_name, row.doctor_name, actor, now)
+        return AdminAppointmentOut(
+            **base.model_dump(),
+            patient=PatientContact(
+                id=appointment.patient_id,
+                name=row.patient_name,
+                phone=row.patient_phone,
+                email=row.patient_email,
+            ),
+            needs_attention=appointment.needs_attention,
+            attention_source=_attention_source(row.attention_source),
         )
 
     def _out(

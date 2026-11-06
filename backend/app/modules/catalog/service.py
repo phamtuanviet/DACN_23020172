@@ -8,6 +8,7 @@ thì dịch vụ và bác sĩ của nó cũng không hiện ở trang công khai
 import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
 
 import structlog
 from sqlalchemy.exc import IntegrityError
@@ -19,11 +20,16 @@ from app.core.errors import AppError, field_error, forbidden, not_found, violate
 from app.core.timeutil import to_local
 from app.db.enums import UserRole
 from app.db.models.catalog import Service, Specialty
+from app.db.models.users import Doctor
+from app.modules.auth.service import create_user, update_staff_account
 from app.modules.catalog import repository as repo
 from app.modules.catalog.schemas import (
+    DoctorAdminOut,
+    DoctorCreate,
     DoctorDetail,
     DoctorOut,
     DoctorRef,
+    DoctorUpdate,
     ServiceAdminOut,
     ServiceBrief,
     ServiceCreate,
@@ -132,6 +138,43 @@ def _specialty_out(row: repo.SpecialtyRow) -> SpecialtyOut:
 
 def _specialty_admin(row: repo.SpecialtyRow) -> SpecialtyAdminOut:
     return SpecialtyAdminOut(**_specialty_out(row).model_dump(), is_active=row.specialty.is_active)
+
+
+MAX_DISPLAY_NAME = 100  # cột users.full_name
+
+
+def display_name(title: str, full_name: str) -> str:
+    """Tên hiển thị của bác sĩ là chức danh + họ tên ("BS.CKI Nguyễn Thu Hà"), lưu ở users."""
+    name = f"{title} {full_name}"
+    if len(name) > MAX_DISPLAY_NAME:
+        raise field_error(
+            "full_name", f"Chức danh và họ tên cộng lại tối đa {MAX_DISPLAY_NAME} ký tự."
+        )
+    return name
+
+
+def _plain_name(name: str, title: str) -> str:
+    prefix = f"{title} "
+    return name[len(prefix) :] if name.startswith(prefix) else name
+
+
+def _doctor_admin(
+    row: repo.DoctorAccountRow, service_ids: list[int], upcoming: int
+) -> DoctorAdminOut:
+    doctor = row.doctor
+    return DoctorAdminOut(
+        id=doctor.user_id,
+        name=row.name,
+        title=doctor.title,
+        full_name=_plain_name(row.name, doctor.title),
+        email=row.email,
+        gender=doctor.gender,
+        bio=doctor.bio,
+        specialty=SpecialtyRef(id=doctor.specialty_id, name=row.specialty_name),
+        service_ids=service_ids,
+        is_active=row.is_active,
+        upcoming_count=upcoming,
+    )
 
 
 # ---------------------------------------------------------------------------- service
@@ -291,7 +334,139 @@ class CatalogService:
         log.info("catalog.service_updated", service_id=service_id, actor_id=actor.user_id)
         return result
 
+    # ------------------------------------------------------------ bác sĩ (FR-ADM-01, FR-CAT-03)
+    async def admin_list_doctors(
+        self, actor: Actor, q: str | None, specialty_id: int | None
+    ) -> list[DoctorAdminOut]:
+        _require_admin(actor)
+        now = self._clock.now()
+        async with self._session.begin():
+            rows = await repo.list_doctor_accounts(
+                self._session, tokens=search_tokens(q), specialty_id=specialty_id
+            )
+            return await self._doctors_admin_out(rows, now)
+
+    async def create_doctor(self, actor: Actor, data: DoctorCreate) -> DoctorAdminOut:
+        """Tạo tài khoản bác sĩ qua `create_user` của auth (docs mục 4.3), gán chuyên khoa và dịch
+        vụ trong cùng một transaction. Email trùng → 409 EMAIL_TAKEN."""
+        _require_admin(actor)
+        now = self._clock.now()
+        async with self._session.begin():
+            if await repo.get_specialty(self._session, data.specialty_id) is None:
+                raise field_error("specialty_id", "Chuyên khoa không tồn tại.")
+            await self._check_services(data.service_ids, data.specialty_id)
+            user = await create_user(
+                self._session,
+                email=data.email,
+                password=data.password,
+                role=UserRole.DOCTOR,
+                full_name=display_name(data.title, data.full_name),
+            )
+            self._session.add(
+                Doctor(
+                    user_id=user.id,
+                    specialty_id=data.specialty_id,
+                    title=data.title,
+                    bio=data.bio,
+                    gender=data.gender,
+                )
+            )
+            await self._session.flush()  # bảng không khai báo relationship: ghi bác sĩ trước
+            await repo.replace_doctor_services(self._session, user.id, data.service_ids)
+            result = await self._doctor_admin_out(user.id, now)
+        log.info("catalog.doctor_created", doctor_id=result.id, actor_id=actor.user_id)
+        return result
+
+    async def update_doctor(
+        self, actor: Actor, doctor_id: int, data: DoctorUpdate
+    ) -> DoctorAdminOut:
+        """Sửa hồ sơ, gán lại dịch vụ, khóa hoặc mở khóa tài khoản (UC14).
+
+        Khóa không hủy lịch đã đặt (giống BR-10): bác sĩ biến khỏi trang công khai, không nhận
+        lịch mới, còn lịch sắp tới (`upcoming_count`) chờ quản trị đổi sang bác sĩ khác hoặc hủy.
+        """
+        _require_admin(actor)
+        now = self._clock.now()
+        changes = data.model_dump(exclude_unset=True)
+        async with self._session.begin():
+            doctor = await repo.lock_doctor(self._session, doctor_id)
+            rows = await repo.list_doctor_accounts(
+                self._session, tokens=[], specialty_id=None, doctor_id=doctor_id
+            )
+            if doctor is None or not rows:
+                raise not_found("Không tìm thấy bác sĩ.")
+            title = changes.get("title") or doctor.title
+            full_name = changes.get("full_name") or _plain_name(rows[0].name, doctor.title)
+            specialty_id = changes.get("specialty_id") or doctor.specialty_id
+            if specialty_id != doctor.specialty_id and (
+                await repo.get_specialty(self._session, specialty_id) is None
+            ):
+                raise field_error("specialty_id", "Chuyên khoa không tồn tại.")
+            assigned = (await repo.all_service_ids_by_doctor(self._session, [doctor_id])).get(
+                doctor_id, []
+            )
+            service_ids: list[int] | None = changes.get("service_ids")
+            if service_ids is None and specialty_id != doctor.specialty_id:
+                specialties = await repo.service_specialties(self._session, assigned)
+                service_ids = [s for s in assigned if specialties.get(s) == specialty_id]
+            if service_ids is not None:
+                await self._check_services(service_ids, specialty_id)
+
+            doctor.title, doctor.specialty_id = title, specialty_id
+            if changes.get("gender") is not None:
+                doctor.gender = changes["gender"]
+            if "bio" in changes:
+                doctor.bio = changes["bio"]
+            renamed = changes.get("title") is not None or changes.get("full_name") is not None
+            await update_staff_account(
+                self._session,
+                actor,
+                doctor_id,
+                full_name=display_name(title, full_name) if renamed else None,
+                is_active=changes.get("is_active"),
+                now=now,
+            )
+            if service_ids is not None and service_ids != assigned:
+                await repo.replace_doctor_services(self._session, doctor_id, service_ids)
+            await self._session.flush()
+            result = await self._doctor_admin_out(doctor_id, now)
+        log.info(
+            "catalog.doctor_updated",
+            doctor_id=doctor_id,
+            actor_id=actor.user_id,
+            is_active=result.is_active,
+        )
+        return result
+
     # ------------------------------------------------------------ nội bộ
+    async def _check_services(self, service_ids: Sequence[int], specialty_id: int) -> None:
+        """Dịch vụ phải có thật và thuộc chuyên khoa của bác sĩ (FR-CAT-03); dịch vụ đang ẩn vẫn
+        gán được nhưng chưa ai đặt được cho tới khi hiện lại."""
+        specialties = await repo.service_specialties(self._session, service_ids)
+        if len(specialties) != len(service_ids):
+            raise field_error("service_ids", "Có dịch vụ không tồn tại.")
+        if any(value != specialty_id for value in specialties.values()):
+            raise field_error("service_ids", "Chỉ gán dịch vụ thuộc chuyên khoa của bác sĩ.")
+
+    async def _doctors_admin_out(
+        self, rows: list[repo.DoctorAccountRow], now: datetime
+    ) -> list[DoctorAdminOut]:
+        ids = [row.doctor.user_id for row in rows]
+        services = await repo.all_service_ids_by_doctor(self._session, ids)
+        upcoming = await repo.upcoming_counts(self._session, ids, now)
+        return [
+            _doctor_admin(
+                row, services.get(row.doctor.user_id, []), upcoming.get(row.doctor.user_id, 0)
+            )
+            for row in rows
+        ]
+
+    async def _doctor_admin_out(self, doctor_id: int, now: datetime) -> DoctorAdminOut:
+        rows = await repo.list_doctor_accounts(
+            self._session, tokens=[], specialty_id=None, doctor_id=doctor_id
+        )
+        return (await self._doctors_admin_out(rows, now))[0]
+
     async def _flush_specialty(self) -> None:
         """Hai quản trị cùng tạo một tên: UNIQUE chặn, trả lỗi tại ô nhập thay vì lỗi 500."""
         try:

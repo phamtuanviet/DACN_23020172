@@ -12,8 +12,11 @@ from app.core.db import SessionDep
 from app.core.security import AdminActorDep, ClockDep
 from app.core.validation import MAX_ID, SafeText
 from app.modules.catalog.schemas import (
+    DoctorAdminOut,
+    DoctorCreate,
     DoctorDetail,
     DoctorOut,
+    DoctorUpdate,
     ServiceAdminOut,
     ServiceCreate,
     ServiceOut,
@@ -122,6 +125,35 @@ async def update_service(
 ) -> ServiceAdminOut:
     """Sửa hoặc ẩn dịch vụ; dịch vụ đã có lịch hẹn chỉ ẩn được, không xóa (FR-CAT-05)."""
     return await service.update_service(actor, service_id, body)
+
+
+@admin_router.get("/doctors")
+async def admin_list_doctors(
+    actor: AdminActorDep,
+    service: CatalogServiceDep,
+    q: SearchQuery = None,
+    specialty_id: IdQuery = None,
+) -> list[DoctorAdminOut]:
+    """Mọi bác sĩ kể cả tài khoản đã khóa; tìm theo họ tên, email (UC14)."""
+    return await service.admin_list_doctors(actor, q, specialty_id)
+
+
+@admin_router.post("/doctors", status_code=status.HTTP_201_CREATED)
+async def create_doctor(
+    body: DoctorCreate, actor: AdminActorDep, service: CatalogServiceDep
+) -> DoctorAdminOut:
+    """Tạo tài khoản bác sĩ, gán chuyên khoa và dịch vụ (FR-ADM-01, FR-AUTH-05, FR-CAT-03).
+    Email đã có tài khoản: 409 EMAIL_TAKEN."""
+    return await service.create_doctor(actor, body)
+
+
+@admin_router.patch("/doctors/{doctor_id}")
+async def update_doctor(
+    doctor_id: IdPath, body: DoctorUpdate, actor: AdminActorDep, service: CatalogServiceDep
+) -> DoctorAdminOut:
+    """Sửa hồ sơ, gán lại dịch vụ (`service_ids`), khóa hoặc mở khóa (`is_active`). Khóa thì bác
+    sĩ mất phiên đăng nhập ngay; lịch đã đặt giữ nguyên để quản trị xử lý (FR-ADM-01)."""
+    return await service.update_doctor(actor, doctor_id, body)
 
 
 router = APIRouter()

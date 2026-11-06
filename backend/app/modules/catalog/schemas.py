@@ -12,8 +12,10 @@ from pydantic_core import PydanticCustomError
 
 from app.core.validation import DbId, no_nul
 from app.db.enums import Gender
+from app.modules.auth.schemas import Email, FullName, Password
 
 MAX_PRICE_VND = 100_000_000
+MAX_DOCTOR_SERVICES = 50
 
 
 def _name(value: str) -> str:
@@ -50,12 +52,28 @@ def _price(value: int) -> int:
     return value
 
 
+def _title(value: str) -> str:
+    value = " ".join(no_nul(value).split())
+    if len(value) < 2:
+        raise PydanticCustomError("title", "Chức danh cần ít nhất 2 ký tự, ví dụ “BS.”.")
+    return value
+
+
+def _service_ids(value: list[int]) -> list[int]:
+    """Bỏ id lặp, giữ thứ tự gửi lên."""
+    return list(dict.fromkeys(value))
+
+
 SpecialtyName = Annotated[str, Field(max_length=100), AfterValidator(_name)]
 ServiceName = Annotated[str, Field(max_length=150), AfterValidator(_name)]
 Description = Annotated[str | None, Field(max_length=2000), AfterValidator(_optional_text)]
 Scope = Annotated[str, Field(max_length=2000), AfterValidator(_scope)]
 Duration = Annotated[int, AfterValidator(_duration)]
 Price = Annotated[int, AfterValidator(_price)]
+Title = Annotated[str, Field(max_length=50), AfterValidator(_title)]
+ServiceIds = Annotated[
+    list[DbId], Field(max_length=MAX_DOCTOR_SERVICES), AfterValidator(_service_ids)
+]
 
 
 # ---------------------------------------------------------------------------- đọc công khai
@@ -156,4 +174,51 @@ class ServiceUpdate(BaseModel):
     scope_description: Scope | None = None
     duration_min: Duration | None = None
     ref_price_vnd: Price | None = None
+    is_active: bool | None = None
+
+
+class DoctorAdminOut(BaseModel):
+    """Bác sĩ trong trang quản trị, kể cả tài khoản đã khóa (FR-ADM-01, FR-CAT-03)."""
+
+    id: int
+    name: str = Field(description="Họ tên kèm chức danh, như trang công khai hiển thị")
+    title: str
+    full_name: str = Field(description="Họ tên không kèm chức danh")
+    email: str
+    gender: Gender
+    bio: str | None
+    specialty: SpecialtyRef
+    service_ids: list[int] = Field(description="Dịch vụ bác sĩ thực hiện, kể cả dịch vụ đã ẩn")
+    is_active: bool = Field(
+        description="false: tài khoản bị khóa, không đăng nhập, không nhận lịch"
+    )
+    upcoming_count: int = Field(description="Số lịch Đã đặt sắp tới, để cảnh báo trước khi khóa")
+
+
+class DoctorCreate(BaseModel):
+    """Tài khoản bác sĩ chỉ do quản trị tạo (FR-AUTH-05). Dịch vụ phải thuộc chuyên khoa của bác
+    sĩ; mật khẩu ban đầu theo cùng quy tắc với đăng ký."""
+
+    email: Email
+    password: Password
+    title: Title
+    full_name: FullName
+    gender: Gender
+    specialty_id: DbId
+    bio: Description = None
+    service_ids: ServiceIds = Field(default_factory=list)
+
+
+class DoctorUpdate(BaseModel):
+    """Chỉ trường được gửi mới đổi; email không đổi được. `is_active = false` là khóa tài khoản.
+
+    Đổi chuyên khoa mà không gửi `service_ids` thì bỏ các dịch vụ không thuộc chuyên khoa mới.
+    """
+
+    title: Title | None = None
+    full_name: FullName | None = None
+    gender: Gender | None = None
+    specialty_id: DbId | None = None
+    bio: Description = None
+    service_ids: ServiceIds | None = None
     is_active: bool | None = None

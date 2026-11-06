@@ -14,6 +14,7 @@ from app.db.enums import AppointmentStatus, Channel, HistoryAction, Notification
 from app.db.models.appointments import AppointmentHistory, Notification
 from app.modules.appointments.service import AffectedAppointment, flag_for_attention
 from app.modules.scheduling.service import Candidate
+from tests.conftest import TEST_NOW
 from tests.integration.conftest import MutableClock
 from tests.integration.factories import (
     MONDAY,
@@ -412,7 +413,12 @@ async def test_flagging_skips_an_appointment_moved_after_it_was_listed(
     admin = Actor(clinic.admin_id, UserRole.ADMIN, Channel.ADMIN)
     async with db.begin():
         flagged = await flag_for_attention(
-            db, admin, clinic.doctor_ids[0], [stale], source={"source": "TIME_OFF", "ref_id": 1}
+            db,
+            admin,
+            clinic.doctor_ids[0],
+            [stale],
+            source={"source": "TIME_OFF", "ref_id": 1},
+            now=TEST_NOW,
         )
     assert flagged == []
     assert (await fetch(db, appointment_id)).needs_attention is False

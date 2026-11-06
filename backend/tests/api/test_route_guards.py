@@ -33,7 +33,8 @@ ADMIN_ROUTES = _routes(ADMIN_ONLY)
 
 
 def test_admin_routes_are_discovered() -> None:
-    assert len(ADMIN_ROUTES) >= 13  # danh mục, ca làm, ngày nghỉ của Sprint 2
+    # danh mục, ca làm, ngày nghỉ (Sprint 2); bác sĩ, lịch hẹn, hàng chờ hỗ trợ (Sprint 5)
+    assert len(ADMIN_ROUTES) >= 20
 
 
 @pytest.mark.parametrize(("method", "path"), ADMIN_ROUTES)
@@ -75,11 +76,14 @@ APPOINTMENT_FORBIDDEN = [
     ("PATCH", "/api/v1/appointments/1/reschedule", DOCTOR),
     ("POST", "/api/v1/appointments/1/cancel", DOCTOR),
     ("PATCH", "/api/v1/appointments/1/status", PATIENT),
+    ("PATCH", "/api/v1/appointments/1/note", PATIENT),
+    ("PATCH", "/api/v1/appointments/1/note", ADMIN),  # quản trị chỉ xem ghi chú (docs mục 4.6)
 ]
 
 
 def test_appointment_routes_are_discovered() -> None:
-    assert len(APPOINTMENT_ROUTES) == 6  # đặt, của tôi, chi tiết, đổi, hủy, đổi trạng thái
+    # đặt, của tôi, chi tiết, đổi, hủy, đổi trạng thái, ghi chú sau khám
+    assert len(APPOINTMENT_ROUTES) == 7
 
 
 @pytest.mark.parametrize(("method", "path"), APPOINTMENT_ROUTES)
@@ -123,5 +127,32 @@ def test_agent_routes_are_for_patients_only(
     """Chỉ bệnh nhân dùng Agent (FR-AGT-01); quản trị cũng không xác nhận đề xuất hộ."""
     client.app.dependency_overrides[get_current_user] = lambda: user  # type: ignore[attr-defined]
     response = client.request(method, path, json={})
+    assert response.status_code == 403
+    assert response.json()["code"] == "FORBIDDEN"
+
+
+DOCTOR_ROUTES = _routes("/api/v1/doctor/")
+
+
+def test_doctor_routes_are_discovered() -> None:
+    assert DOCTOR_ROUTES == [("GET", "/api/v1/doctor/schedule")]
+
+
+@pytest.mark.parametrize(("method", "path"), DOCTOR_ROUTES)
+def test_doctor_route_without_token_returns_401(client: TestClient, method: str, path: str) -> None:
+    response = client.request(method, path)
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize(("method", "path"), DOCTOR_ROUTES)
+@pytest.mark.parametrize("user", [PATIENT, ADMIN], ids=["patient", "admin"])
+def test_doctor_routes_are_for_doctors_only(
+    client: TestClient, method: str, path: str, user: CurrentUser
+) -> None:
+    """Lịch khám chỉ dành cho bác sĩ, và chỉ của chính mình (AC-09)."""
+    client.app.dependency_overrides[get_current_user] = lambda: user  # type: ignore[attr-defined]
+    response = client.request(
+        method, path, params={"date_from": "2026-10-12", "date_to": "2026-10-12"}
+    )
     assert response.status_code == 403
     assert response.json()["code"] == "FORBIDDEN"

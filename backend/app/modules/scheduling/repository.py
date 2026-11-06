@@ -131,3 +131,51 @@ async def booked_overlapping(
     for doctor_id, start_at, end_at in (await session.execute(stmt)).all():
         result.setdefault(doctor_id, []).append(Interval(start_at, end_at))
     return result
+
+
+# ---------------------------------------------------------------------- lịch làm của một bác sĩ
+@dataclass(frozen=True, slots=True)
+class TimeOffRow:
+    start_at: datetime
+    end_at: datetime
+    reason: str | None
+
+
+async def shift_rules_of(
+    session: AsyncSession, doctor_id: int, first_day: date, last_day: date
+) -> list[ShiftRule]:
+    """Ca làm của bác sĩ có hiệu lực trong khoảng ngày (trang lịch khám của bác sĩ)."""
+    stmt = (
+        select(Shift)
+        .where(
+            Shift.doctor_id == doctor_id,
+            Shift.valid_from <= last_day,
+            or_(Shift.valid_to.is_(None), Shift.valid_to >= first_day),
+        )
+        .order_by(Shift.weekday, Shift.start_time)
+    )
+    return [
+        ShiftRule(s.doctor_id, s.weekday, s.start_time, s.end_time, s.valid_from, s.valid_to)
+        for s in (await session.execute(stmt)).scalars()
+    ]
+
+
+async def time_offs_of(
+    session: AsyncSession,
+    doctor_id: int,
+    start: datetime,
+    end: datetime | None,
+    *,
+    limit: int | None = None,
+) -> list[TimeOffRow]:
+    """Ngày nghỉ chồng khoảng [start, end) (end rỗng: mọi ngày nghỉ kết thúc sau start)."""
+    stmt = (
+        select(TimeOff.start_at, TimeOff.end_at, TimeOff.reason)
+        .where(TimeOff.doctor_id == doctor_id, TimeOff.end_at > start)
+        .order_by(TimeOff.start_at)
+    )
+    if end is not None:
+        stmt = stmt.where(TimeOff.start_at < end)
+    if limit is not None:
+        stmt = stmt.limit(limit)
+    return [TimeOffRow(*row) for row in (await session.execute(stmt)).all()]

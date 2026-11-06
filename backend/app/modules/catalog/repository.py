@@ -7,11 +7,12 @@ tuần tự vì mỗi bảng chỉ vài chục dòng (docs mục 7.2).
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import ColumnElement, and_, exists, func, or_, select
+from sqlalchemy import ColumnElement, and_, delete, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.enums import AppointmentStatus
 from app.db.models.appointments import Appointment
 from app.db.models.catalog import DoctorService, Service, Specialty
 from app.db.models.schedule import Shift
@@ -36,6 +37,17 @@ class ServiceRow:
 class DoctorRow:
     doctor: Doctor
     name: str
+    specialty_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class DoctorAccountRow:
+    """Bác sĩ kèm tài khoản, cho trang quản trị (gồm cả tài khoản đã khóa)."""
+
+    doctor: Doctor
+    name: str
+    email: str
+    is_active: bool
     specialty_name: str
 
 
@@ -247,6 +259,90 @@ async def services_by_doctor(
     for doctor_id, service in (await session.execute(stmt)).all():
         result[doctor_id].append(service)
     return result
+
+
+async def list_doctor_accounts(
+    session: AsyncSession,
+    *,
+    tokens: Sequence[str],
+    specialty_id: int | None,
+    doctor_id: int | None = None,
+) -> list[DoctorAccountRow]:
+    """Mọi bác sĩ, kể cả đã khóa hay thuộc chuyên khoa đã ẩn; tìm theo họ tên, email."""
+    stmt = (
+        select(Doctor, User.full_name, User.email, User.is_active, Specialty.name)
+        .join(User, User.id == Doctor.user_id)
+        .join(Specialty, Specialty.id == Doctor.specialty_id)
+        .where(User.anonymized_at.is_(None))
+        .order_by(User.id)
+    )
+    if specialty_id is not None:
+        stmt = stmt.where(Doctor.specialty_id == specialty_id)
+    if doctor_id is not None:
+        stmt = stmt.where(Doctor.user_id == doctor_id)
+    stmt = stmt.where(*_matches_all(func.concat_ws(" ", User.full_name, User.email), tokens))
+    rows = (await session.execute(stmt)).all()
+    return [DoctorAccountRow(row[0], row[1], row[2], row[3], row[4]) for row in rows]
+
+
+async def lock_doctor(session: AsyncSession, doctor_id: int) -> Doctor | None:
+    """`FOR UPDATE` như module schedule: sửa bác sĩ chờ các lượt đặt lịch đang giữ `FOR SHARE`."""
+    stmt = select(Doctor).where(Doctor.user_id == doctor_id).with_for_update()
+    return (await session.execute(stmt)).scalar_one_or_none()
+
+
+async def all_service_ids_by_doctor(
+    session: AsyncSession, doctor_ids: Sequence[int]
+) -> dict[int, list[int]]:
+    """Mọi dịch vụ được gán, kể cả dịch vụ đã ẩn (quản trị cần thấy để bỏ gán)."""
+    if not doctor_ids:
+        return {}
+    stmt = (
+        select(DoctorService.doctor_id, DoctorService.service_id)
+        .where(DoctorService.doctor_id.in_(doctor_ids))
+        .order_by(DoctorService.service_id)
+    )
+    result: dict[int, list[int]] = defaultdict(list)
+    for doctor_id, service_id in (await session.execute(stmt)).all():
+        result[doctor_id].append(service_id)
+    return result
+
+
+async def service_specialties(session: AsyncSession, service_ids: Sequence[int]) -> dict[int, int]:
+    """{service_id: specialty_id} của các dịch vụ có thật."""
+    if not service_ids:
+        return {}
+    stmt = select(Service.id, Service.specialty_id).where(Service.id.in_(service_ids))
+    return {service_id: specialty_id for service_id, specialty_id in (await session.execute(stmt))}
+
+
+async def replace_doctor_services(
+    session: AsyncSession, doctor_id: int, service_ids: Sequence[int]
+) -> None:
+    """Gán lại toàn bộ dịch vụ của bác sĩ (dữ liệu cấu hình, xóa được: docs mục 10.6)."""
+    await session.execute(delete(DoctorService).where(DoctorService.doctor_id == doctor_id))
+    session.add_all(
+        DoctorService(doctor_id=doctor_id, service_id=service_id) for service_id in service_ids
+    )
+    await session.flush()
+
+
+async def upcoming_counts(
+    session: AsyncSession, doctor_ids: Sequence[int], now: datetime
+) -> dict[int, int]:
+    """Số lịch Đã đặt sắp tới của từng bác sĩ."""
+    if not doctor_ids:
+        return {}
+    stmt = (
+        select(Appointment.doctor_id, func.count())
+        .where(
+            Appointment.doctor_id.in_(doctor_ids),
+            Appointment.status == AppointmentStatus.BOOKED,
+            Appointment.start_at > now,
+        )
+        .group_by(Appointment.doctor_id)
+    )
+    return {doctor_id: count for doctor_id, count in (await session.execute(stmt)).all()}
 
 
 async def current_shifts(session: AsyncSession, doctor_id: int, today: date) -> list[Shift]:

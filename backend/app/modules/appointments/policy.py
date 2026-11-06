@@ -51,6 +51,19 @@ def ensure_can_list_own(actor: Actor) -> int:
     return ensure_can_book(actor)
 
 
+def ensure_is_doctor(actor: Actor) -> int:
+    """Lịch khám của bác sĩ: chỉ bác sĩ, và chỉ lịch của chính mình (AC-09)."""
+    if actor.role is not UserRole.DOCTOR or actor.user_id is None:
+        raise forbidden()
+    return actor.user_id
+
+
+def ensure_admin(actor: Actor) -> None:
+    """Danh sách mọi lịch hẹn, gắn hoặc gỡ cờ thủ công: chỉ quản trị (FR-ADM-03, 04)."""
+    if actor.role is not UserRole.ADMIN:
+        raise forbidden()
+
+
 def ensure_can_manage_schedule(actor: Actor) -> None:
     """Xem lịch hẹn theo bác sĩ (kèm họ tên bệnh nhân) và gắn cờ "cần xử lý" (BR-10): chỉ quản trị
     hoặc tác vụ hệ thống."""
@@ -119,6 +132,22 @@ def ensure_can_set_status_owner(appointment: Appointment, actor: Actor) -> None:
     if actor.role is UserRole.ADMIN or _is_doctor_of(appointment, actor):
         return
     raise forbidden()
+
+
+NOTE_STATUSES = (AppointmentStatus.ARRIVED, AppointmentStatus.COMPLETED)
+
+
+def ensure_can_write_note(appointment: Appointment, actor: Actor) -> None:
+    """Ghi chú sau khám: chỉ bác sĩ của lịch; quản trị chỉ xem (docs mục 4.6, FR-DOC-03).
+
+    Chỉ ghi khi bệnh nhân đã đến hoặc đã khám; không giới hạn ngày để bác sĩ ghi nốt sau buổi khám.
+    """
+    if not _is_doctor_of(appointment, actor):
+        raise forbidden()
+    if appointment.status not in NOTE_STATUSES:
+        raise invalid_transition(
+            "Chỉ ghi chú cho lịch hẹn bệnh nhân đã đến hoặc đã khám.", appointment.status
+        )
 
 
 def ensure_valid_status_change(

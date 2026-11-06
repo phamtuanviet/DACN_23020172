@@ -11,11 +11,13 @@ from datetime import date, datetime, time, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.actor import Actor
 from app.core.clock import Clock
 from app.core.config import Settings
-from app.core.errors import AppError, field_error, not_found
+from app.core.errors import AppError, field_error, forbidden, not_found
 from app.core.timeutil import format_slot, local_datetime, to_local
 from app.core.validation import MAX_DATE, MIN_DATE
+from app.db.enums import UserRole
 from app.modules.catalog.schemas import DoctorRef
 from app.modules.catalog.service import ServiceInfo, get_bookable_service, get_bookable_services
 from app.modules.scheduling import repository as repo
@@ -146,6 +148,53 @@ async def load_snapshot(
 
 def _days(first_day: date, last_day: date) -> list[date]:
     return [first_day + timedelta(days=i) for i in range((last_day - first_day).days + 1)]
+
+
+# ---------------------------------------------------------------------------- lịch làm của bác sĩ
+UPCOMING_TIME_OFFS = 3
+
+
+@dataclass(frozen=True, slots=True)
+class DoctorCalendar:
+    """Giờ làm cụ thể từng ngày (ca làm đã trải ra lịch), ngày nghỉ trong khoảng và vài ngày nghỉ
+    sắp tới: khung cho trang lịch khám của bác sĩ (UC12)."""
+
+    work: list[Interval]
+    time_offs: list[repo.TimeOffRow]
+    upcoming_time_offs: list[repo.TimeOffRow]
+
+
+async def doctor_calendar(
+    session: AsyncSession,
+    actor: Actor,
+    doctor_id: int,
+    first_day: date,
+    last_day: date,
+    now: datetime,
+) -> DoctorCalendar:
+    """Chạy trong transaction của người gọi (module appointments). Hàm dùng chung nên tự kiểm
+    quyền (lớp 2, docs mục 4.6): bác sĩ chỉ xem giờ làm, ngày nghỉ của chính mình."""
+    if actor.role is not UserRole.DOCTOR or actor.user_id != doctor_id:
+        raise forbidden()
+    rules = await repo.shift_rules_of(session, doctor_id, first_day, last_day)
+    work = sorted(
+        (
+            rule.interval_on(day)
+            for day in _days(first_day, last_day)
+            for rule in rules
+            if rule.applies_on(day)
+        ),
+        key=lambda item: item.start,
+    )
+    start = local_datetime(first_day, time(0))
+    end = local_datetime(last_day + timedelta(days=1), time(0))
+    return DoctorCalendar(
+        work=work,
+        time_offs=await repo.time_offs_of(session, doctor_id, start, end),
+        upcoming_time_offs=await repo.time_offs_of(
+            session, doctor_id, now, None, limit=UPCOMING_TIME_OFFS
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------- dùng cho appointments

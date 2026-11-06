@@ -5,15 +5,16 @@ Câu khóa dòng dùng `populate_existing`: dòng đã nạp trước đó trong
 chờ khóa, nên kiểm tra nghiệp vụ luôn chạy trên dữ liệu mới nhất.
 """
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from sqlalchemy import Select, and_, func, not_, select
+from sqlalchemy import ColumnElement, Select, and_, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.db.enums import AppointmentStatus, UserRole
+from app.db.enums import AppointmentStatus, Channel, HistoryAction, UserRole
 from app.db.models.appointments import Appointment, AppointmentHistory
 from app.db.models.catalog import Service
 from app.db.models.users import Doctor, PatientProfile, User
@@ -43,6 +44,39 @@ class DetailRow:
     doctor_name: str
     patient_name: str
     patient_birthday: date | None
+
+
+@dataclass(frozen=True, slots=True)
+class ScheduleRow:
+    appointment: Appointment
+    service_name: str
+    patient_name: str
+    patient_birthday: date | None
+
+
+@dataclass(frozen=True, slots=True)
+class AdminRow:
+    appointment: Appointment
+    service_name: str
+    doctor_name: str
+    patient_name: str
+    patient_phone: str | None
+    patient_email: str
+    attention_source: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class AdminFilter:
+    """Bộ lọc danh sách lịch hẹn của quản trị (FR-ADM-03); trường rỗng là không lọc."""
+
+    start: datetime | None = None
+    end: datetime | None = None
+    doctor_id: int | None = None
+    status: AppointmentStatus | None = None
+    channel: Channel | None = None
+    needs_attention: bool | None = None
+    q: str | None = None
+    appointment_id: int | None = None
 
 
 async def lock_patient(session: AsyncSession, patient_id: int) -> User | None:
@@ -250,3 +284,115 @@ async def doctor_names(session: AsyncSession, doctor_ids: Sequence[int]) -> dict
         return {}
     stmt = select(User.id, User.full_name).where(User.id.in_(doctor_ids))
     return {user_id: name for user_id, name in (await session.execute(stmt)).all()}
+
+
+# ---------------------------------------------------------------------------- bác sĩ
+async def list_for_doctor(
+    session: AsyncSession, doctor_id: int, start: datetime, end: datetime
+) -> list[ScheduleRow]:
+    """Lịch của bác sĩ bắt đầu trong [start, end), mọi trạng thái; dùng chỉ mục
+    `appointments (doctor_id, start_at)`."""
+    stmt = (
+        select(Appointment, Service.name, User.full_name, PatientProfile.date_of_birth)
+        .join(Service, Service.id == Appointment.service_id)
+        .join(User, User.id == Appointment.patient_id)
+        .outerjoin(PatientProfile, PatientProfile.user_id == Appointment.patient_id)
+        .where(
+            Appointment.doctor_id == doctor_id,
+            Appointment.start_at >= start,
+            Appointment.start_at < end,
+        )
+        .order_by(Appointment.start_at, Appointment.id)
+    )
+    rows = (await session.execute(stmt)).all()
+    return [ScheduleRow(row[0], row[1], row[2], row[3]) for row in rows]
+
+
+async def previous_visits(
+    session: AsyncSession,
+    *,
+    patient_id: int,
+    doctor_id: int,
+    before: datetime,
+    limit: int,
+) -> list[tuple[Appointment, str]]:
+    """Lần khám đã diễn ra (Đã khám, Vắng mặt) của bệnh nhân với chính bác sĩ này, mới nhất
+    trước."""
+    stmt = (
+        select(Appointment, Service.name)
+        .join(Service, Service.id == Appointment.service_id)
+        .where(
+            Appointment.patient_id == patient_id,
+            Appointment.doctor_id == doctor_id,
+            Appointment.start_at < before,
+            Appointment.status.in_((AppointmentStatus.COMPLETED, AppointmentStatus.NO_SHOW)),
+        )
+        .order_by(Appointment.start_at.desc())
+        .limit(limit)
+    )
+    return [(row[0], row[1]) for row in (await session.execute(stmt)).all()]
+
+
+# ---------------------------------------------------------------------------- quản trị
+def _like(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def _search(q: str) -> ColumnElement[bool]:
+    """Mã lịch, họ tên bệnh nhân (không dấu) hoặc số điện thoại (bỏ dấu cách, dấu chấm)."""
+    conditions: list[ColumnElement[bool]] = [
+        Appointment.code.ilike(_like(q)),
+        func.unaccent(User.full_name).ilike(func.unaccent(_like(q))),
+    ]
+    digits = re.sub(r"\D", "", q)
+    if len(digits) >= 3:
+        conditions.append(User.phone.like(_like(digits)))
+    return or_(*conditions)
+
+
+async def list_for_admin(
+    session: AsyncSession, query: AdminFilter, *, offset: int, limit: int
+) -> tuple[list[AdminRow], int]:
+    """Mọi lịch hẹn theo bộ lọc, xếp theo giờ khám tăng dần."""
+    doctor = aliased(User, name="doctor_user")
+    base = select(Appointment).join(User, User.id == Appointment.patient_id)
+    if query.start is not None:
+        base = base.where(Appointment.start_at >= query.start)
+    if query.end is not None:
+        base = base.where(Appointment.start_at < query.end)
+    if query.doctor_id is not None:
+        base = base.where(Appointment.doctor_id == query.doctor_id)
+    if query.status is not None:
+        base = base.where(Appointment.status == query.status)
+    if query.channel is not None:
+        base = base.where(Appointment.channel == query.channel)
+    if query.needs_attention is not None:
+        base = base.where(Appointment.needs_attention.is_(query.needs_attention))
+    if query.appointment_id is not None:
+        base = base.where(Appointment.id == query.appointment_id)
+    if query.q:
+        base = base.where(_search(query.q))
+    total = (await session.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
+    source = (
+        select(AppointmentHistory.new_value["source"].astext)
+        .where(
+            AppointmentHistory.appointment_id == Appointment.id,
+            AppointmentHistory.action == HistoryAction.FLAG,
+        )
+        .order_by(AppointmentHistory.created_at.desc(), AppointmentHistory.id.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
+    stmt = (
+        base.add_columns(
+            Service.name, doctor.full_name, User.full_name, User.phone, User.email, source
+        )
+        .join(Service, Service.id == Appointment.service_id)
+        .join(doctor, doctor.id == Appointment.doctor_id)
+        .order_by(Appointment.start_at, Appointment.id)
+        .offset(offset)
+        .limit(limit)
+    )
+    rows = (await session.execute(stmt)).all()
+    return [AdminRow(*row) for row in rows], total

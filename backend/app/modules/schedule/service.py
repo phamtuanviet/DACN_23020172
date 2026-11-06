@@ -279,6 +279,7 @@ class ScheduleService:
             doctor_id,
             affected,
             source={"source": source, "ref_id": ref_id},
+            now=self._clock.now(),
         )
 
 

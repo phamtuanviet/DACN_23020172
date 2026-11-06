@@ -10,12 +10,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.actor import Actor
 from app.core.clock import Clock
-from app.core.errors import field_error, forbidden
+from app.core.errors import field_error, forbidden, not_found
 from app.core.timeutil import to_local
 from app.db.enums import SupportStatus, UserRole
 from app.db.models.agent import SupportRequest
 from app.modules.support import repository as repo
-from app.modules.support.schemas import MAX_SUMMARY_LENGTH, SupportRequestOut
+from app.modules.support.schemas import (
+    MAX_SUMMARY_LENGTH,
+    SupportPatient,
+    SupportRequestAdminOut,
+    SupportRequestOut,
+    SupportRequestUpdate,
+)
 
 log = structlog.get_logger(__name__)
 
@@ -62,3 +68,55 @@ class SupportService:
         return SupportRequestOut(
             id=request.id, status=request.status, created_at=to_local(request.created_at)
         )
+
+    # ------------------------------------------------------------ quản trị (FR-ADM-04)
+    async def admin_list(
+        self, actor: Actor, status: SupportStatus | None
+    ) -> list[SupportRequestAdminOut]:
+        _require_admin(actor)
+        async with self._session.begin():
+            rows = await repo.list_requests(self._session, status=status)
+        return [_admin_out(row) for row in rows]
+
+    async def update(
+        self, actor: Actor, request_id: int, data: SupportRequestUpdate
+    ) -> SupportRequestAdminOut:
+        """Đánh dấu đã xử lý (ghi người xử lý, thời điểm) hoặc mở lại."""
+        _require_admin(actor)
+        now = self._clock.now()
+        async with self._session.begin():
+            request = await repo.lock_request(self._session, request_id)
+            if request is None:
+                raise not_found("Không tìm thấy yêu cầu hỗ trợ.")
+            if request.status is not data.status:
+                request.status = data.status
+                done = data.status is SupportStatus.DONE
+                request.handled_by = actor.user_id if done else None
+                request.handled_at = now if done else None
+            await self._session.flush()
+            rows = await repo.list_requests(self._session, status=None, request_id=request_id)
+        log.info("support.updated", support_request_id=request_id, status=data.status.value)
+        return _admin_out(rows[0])
+
+
+def _require_admin(actor: Actor) -> None:
+    if actor.role is not UserRole.ADMIN:
+        raise forbidden()
+
+
+def _admin_out(row: repo.SupportRow) -> SupportRequestAdminOut:
+    request = row.request
+    return SupportRequestAdminOut(
+        id=request.id,
+        status=request.status,
+        created_at=to_local(request.created_at),
+        patient=SupportPatient(
+            id=request.patient_id,
+            name=row.patient_name,
+            phone=row.patient_phone,
+            email=row.patient_email,
+        ),
+        summary=request.summary,
+        handled_by=row.handled_by,
+        handled_at=to_local(request.handled_at) if request.handled_at else None,
+    )

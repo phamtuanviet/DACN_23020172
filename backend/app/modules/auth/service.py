@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.actor import Actor
 from app.core.clock import Clock
 from app.core.config import Settings
-from app.core.errors import AppError, field_error, violated_constraint
+from app.core.errors import AppError, field_error, forbidden, violated_constraint
 from app.core.security import (
     create_access_token,
     hash_password_async,
@@ -117,6 +117,40 @@ async def create_user(
         if violated_constraint(exc) == EMAIL_UNIQUE_INDEX:
             raise email_taken() from exc
         raise
+    return user
+
+
+async def update_staff_account(
+    session: AsyncSession,
+    actor: Actor,
+    user_id: int,
+    *,
+    full_name: str | None = None,
+    is_active: bool | None = None,
+    now: datetime,
+) -> User:
+    """Quản trị sửa họ tên hoặc khóa, mở khóa tài khoản bác sĩ (catalog, FR-ADM-01).
+
+    Chạy trong transaction của người gọi. Hàm dùng chung nên tự kiểm quyền (lớp 2, docs mục 4.6):
+    chỉ quản trị, chỉ trên tài khoản bác sĩ. Khóa thì thu hồi mọi refresh token; access token
+    đang dùng mất hiệu lực ngay vì mỗi request đọc lại `is_active`. Mở khóa thì gỡ luôn khóa tạm
+    do nhập sai mật khẩu.
+    """
+    if actor.role is not UserRole.ADMIN:
+        raise forbidden()
+    user = await repo.get_user(session, user_id, for_update=True)
+    if user is None:
+        raise AppError("NOT_FOUND", "Không tìm thấy tài khoản.", status=404)
+    if user.role is not UserRole.DOCTOR:
+        raise forbidden()
+    if full_name is not None:
+        user.full_name = full_name
+    if is_active is not None and is_active != user.is_active:
+        user.is_active = is_active
+        if is_active:
+            user.failed_login_count, user.locked_until = 0, None
+        else:
+            await repo.revoke_all_of_user(session, user.id, now)
     return user
 
 
@@ -258,11 +292,14 @@ class AuthService:
         return to_me(user, profile)
 
     async def update_me(self, actor: Actor, data: UpdateMeRequest) -> MeResponse:
-        """FR-AUTH-06: sửa họ tên, số điện thoại; bệnh nhân sửa thêm ngày sinh, giới tính."""
+        """FR-AUTH-06: sửa họ tên, số điện thoại; bệnh nhân sửa thêm ngày sinh, giới tính. Họ tên
+        của bác sĩ là tên công khai kèm chức danh nên chỉ quản trị sửa (trang Bác sĩ)."""
         if data.date_of_birth is not None:
             self._check_birth_date(data.date_of_birth, self._clock.now())
         async with self._session.begin():
             user = await self._load_user(actor, for_update=True)
+            if data.full_name is not None and user.role is UserRole.DOCTOR:
+                raise field_error("full_name", "Họ tên, chức danh của bác sĩ do quản trị cập nhật.")
             profile = await self._profile_of(user)
             if profile is None and data.date_of_birth is not None:
                 raise field_error("date_of_birth", "Chỉ hồ sơ bệnh nhân có ngày sinh.")

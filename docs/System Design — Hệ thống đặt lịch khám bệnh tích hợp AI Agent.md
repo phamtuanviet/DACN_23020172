@@ -273,7 +273,7 @@ Mũi tên nghĩa là "gọi hàm của". Quy tắc: không có vòng phụ thu�
 - Refresh token: chuỗi ngẫu nhiên 256 bit (không phải JWT), hết hạn sau 7 ngày. Database chỉ lưu SHA-256 của token trong bảng `refresh_tokens` (mục 7.4), nên lộ bản sao database cũng không dùng được token. Token nằm trong cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth`.
 - Xoay vòng: mỗi lần gọi `/auth/refresh`, token cũ bị thu hồi và một token mới cùng `family_id` được cấp. Nếu một token đã thu hồi bị dùng lại — dấu hiệu token bị đánh cắp — cả family bị thu hồi và người dùng phải đăng nhập lại. Ngoại lệ: token vừa bị xoay trong vòng 30 giây (hai tab mở cùng lúc cùng refresh) được cấp thêm một token cùng family thay vì thu hồi, với điều kiện family còn token chưa thu hồi. Sau khi đổi mật khẩu, đăng xuất hay bị khóa tài khoản, family không còn token sống nên token cũ bị từ chối, kể cả trong 30 giây đó.
 - Thu hồi: đăng xuất thu hồi cả family của token hiện tại (phiên đăng nhập trên thiết bị đó, gồm token tab khác vừa nhận trong khoảng ân hạn); đổi mật khẩu, yêu cầu xóa tài khoản và quản trị khóa tài khoản thu hồi mọi token của người dùng đó. Mọi luồng của auth (đăng nhập, refresh, đăng xuất, đổi mật khẩu, khóa tài khoản) khóa dòng `users` trước rồi mới khóa `refresh_tokens`, bằng `FOR NO KEY UPDATE` để không chặn khóa của khóa ngoại. Nhờ vậy, đổi mật khẩu đúng lúc một lượt refresh đang chạy sẽ chờ lượt đó commit rồi mới thu hồi, nên thu hồi được cả token vừa cấp.
-- Mỗi request, `current_user` giải mã access token rồi đọc dòng `users` theo khóa chính (một truy vấn khoảng 1 ms) để kiểm tra `is_active`; tài khoản bị khóa mất quyền ngay, không đợi token hết hạn.
+- Mỗi request, `current_user` giải mã access token rồi đọc dòng `users` theo khóa chính (một truy vấn khoảng 1 ms) để kiểm tra `is_active`; tài khoản bị khóa mất quyền ngay, không đợi token hết hạn. Quản trị mở khóa thì gỡ luôn khóa tạm do nhập sai mật khẩu; access token cấp trước lúc khóa, nếu còn hạn (tối đa 30 phút), dùng lại được sau khi mở khóa. Chấp nhận rủi ro này thay vì thêm cột mốc phiên vào `users`.
 - Đăng nhập sai tăng `failed_login_count`; lần sai thứ 5 đặt `locked_until = now + 15 phút` và trả ngay `429 ACCOUNT_LOCKED` kèm `details.locked_until` (FR-AUTH-03); đăng nhập đúng đặt lại bộ đếm. Thông báo lỗi không phân biệt "sai email" với "sai mật khẩu"; email không tồn tại vẫn băm thử một lần để thời gian phản hồi như nhau. Nhập sai mật khẩu hiện tại khi đổi mật khẩu cũng tính vào bộ đếm này, để access token bị lộ không dùng được vào việc đoán mật khẩu.
 - Giới hạn tốc độ theo IP: đăng nhập 10 lần/phút, đăng ký 5 lần/phút, refresh 60 lần/phút, đổi mật khẩu 5 lần/phút. Theo người dùng: đặt, đổi, hủy lịch 10 lần/phút (mỗi lần sinh một email, nên chặn spam email vào hộp thư người khác và dò id lịch hẹn).
 - Đánh đổi đã chấp nhận: lỗi `ACCOUNT_LOCKED` cho biết email có tài khoản. Điều này không lộ thêm gì vì đăng ký vốn trả `EMAIL_TAKEN` (mục 7.1); giới hạn theo IP làm việc dò email chậm lại. Muốn kín hơn thì đổi cả hai sang thông báo chung kèm email cho chủ tài khoản.
@@ -286,9 +286,9 @@ Mũi tên nghĩa là "gọi hàm của". Quy tắc: không có vòng phụ thu�
 | Đặt lịch | Cho chính mình (web, Agent) | — | — (đặt hộ ngoài phạm vi) |
 | Đổi, hủy | Của mình, trạng thái BOOKED, còn ≥ 2 giờ | — | Mọi lịch BOOKED, không giới hạn 2 giờ (FR-ADM-03) |
 | Đổi trạng thái | — | Lịch của mình trong ngày: BOOKED → ARRIVED, ARRIVED → COMPLETED, BOOKED → NO_SHOW | Mọi chuyển hợp lệ |
-| Ghi chú sau khám | Xem ghi chú lịch của mình | Ghi cho lịch của mình | Xem |
+| Ghi chú sau khám | Xem ghi chú lịch của mình | Ghi cho lịch của mình khi bệnh nhân đã đến hoặc đã khám, kể cả ngày đã qua | Xem |
 | Đánh giá (P2) | Lịch của mình đã COMPLETED, một lần | — | Xem |
-| Thông tin bệnh nhân hiển thị | — | Họ tên, tuổi (tính từ ngày sinh), dịch vụ, giờ, lý do khám; không thấy email, số điện thoại, ngày sinh, lý do hủy | Đầy đủ |
+| Thông tin bệnh nhân hiển thị | — | Họ tên, tuổi (tính từ ngày sinh), dịch vụ, giờ, lý do khám; các lần khám trước của bệnh nhân với chính bác sĩ đó (kèm ghi chú); không thấy email, số điện thoại, ngày sinh, lý do hủy | Đầy đủ, gồm email và số điện thoại để gọi lại |
 
 Tài khoản quản trị có quyền trên mọi dữ liệu bệnh nhân, nên trước khi go-live nên bật xác thực hai lớp (TOTP) cho vai trò ADMIN (mục 11.8).
 
@@ -481,6 +481,10 @@ Thêm ngày nghỉ gồm hai bước, khớp UC15 bước 4–6:
 2. Quản trị xác nhận, frontend gọi lại không có `dry_run`. Trong một transaction: khóa dòng bác sĩ `FOR UPDATE`, INSERT `time_offs`, đặt `needs_attention = true` cho các lịch bị ảnh hưởng và ghi history `FLAG` với kênh ADMIN.
 
 Xóa hoặc thu hẹp ca làm dùng đúng cơ chế này: lịch nào không còn nằm trong ca nào sau thay đổi sẽ bị gắn cờ. Danh sách lịch bị ảnh hưởng được đọc trước khi khóa từng lịch, nên dưới khóa service kiểm tra lại và bỏ qua lịch vừa được bệnh nhân dời sang bác sĩ hoặc giờ khác. Hệ thống không bao giờ tự hủy lịch. Cờ được gỡ tự động khi lịch được đổi, hủy hoặc rời trạng thái BOOKED, hoặc gỡ thủ công qua `PATCH /admin/appointments/{id}/attention` (FR-ADM-04). Bệnh nhân thấy lịch của mình đang "cần xử lý" (phòng khám sẽ liên hệ), còn dòng history `FLAG` là việc nội bộ nên chỉ quản trị thấy. Kiểm tra ca chồng ca (UC15 bước 3) nằm ở service: cùng bác sĩ, cùng thứ, khoảng hiệu lực giao nhau và khoảng giờ giao nhau thì trả 409 `SHIFT_OVERLAP`.
+
+Mỗi lần gắn hoặc gỡ cờ ghi một dòng history `FLAG`; `new_value.source` cho biết nguồn (`TIME_OFF`, `SHIFT_CHANGE`, `SHIFT_DELETE`, hoặc `MANUAL` khi quản trị tự gắn cờ cho lịch BOOKED qua cùng endpoint), để hàng chờ hiện lý do "Bác sĩ nghỉ", "Ca làm thay đổi". Thời điểm ghi lấy từ `Clock` như mọi dòng history khác.
+
+Khóa tài khoản bác sĩ (`PATCH /admin/doctors/{id}` với `is_active = false`) cũng không hủy lịch: bác sĩ mất phiên ngay, biến khỏi trang công khai và không nhận lịch mới, còn lịch sắp tới giữ nguyên. Vì `catalog` không được gọi `appointments` (mục 4.4), khóa tài khoản không tự gắn cờ; thay vào đó `DoctorAdminOut.upcoming_count` cho biết số lịch Đã đặt sắp tới, form khóa nhắc số này và dẫn tới danh sách lịch hẹn lọc theo bác sĩ để quản trị đổi sang bác sĩ khác hoặc hủy.
 
 ## 6. Thiết kế AI Agent
 
@@ -731,7 +735,7 @@ API là REST + JSON với tiền tố `/api/v1`, một bộ endpoint dùng chung
 | `POST /auth/login` | Khách | Trả access token, đặt cookie refresh; giới hạn 10 lần/phút/IP | FR-AUTH-02, 03 |
 | `POST /auth/refresh` | Có cookie | Cấp access token mới, xoay vòng refresh token | FR-AUTH-02 |
 | `POST /auth/logout` (mới) | Đã đăng nhập | Thu hồi refresh token hiện tại, xóa cookie | UC02 |
-| `GET /me`, `PATCH /me` | Đã đăng nhập | Xem, sửa thông tin cá nhân (trừ email) | FR-AUTH-06 |
+| `GET /me`, `PATCH /me` | Đã đăng nhập | Xem, sửa thông tin cá nhân (trừ email). Bác sĩ không tự đổi họ tên: đó là tên công khai kèm chức danh, quản trị sửa qua `/admin/doctors` (422 ở trường `full_name`) | FR-AUTH-06 |
 | `POST /me/password` (mới) | Đã đăng nhập | Đổi mật khẩu, thu hồi mọi refresh token | FR-AUTH-06 |
 | `DELETE /me` (mới) | Bệnh nhân | Yêu cầu xóa tài khoản: hủy lịch sắp tới, ẩn danh hóa thông tin cá nhân, thu hồi mọi phiên | Mục 11.8 |
 
@@ -752,25 +756,25 @@ API là REST + JSON với tiền tố `/api/v1`, một bộ endpoint dùng chung
 | --- | --- | --- | --- |
 | `POST /appointments` | Bệnh nhân | Đặt lịch; `doctor_id` rỗng nghĩa là bác sĩ bất kỳ | FR-APT-01 |
 | `GET /appointments/me?scope=upcoming\|history&status=&page=&page_size=` | Bệnh nhân | Sắp tới: lịch Đã đặt, Đã đến chưa kết thúc, gần nhất trước. Lịch sử: mọi lịch còn lại, mới nhất trước. Phân trang theo mục 8.1 | FR-APT-04 |
-| `GET /appointments/{id}` (mới) | Chủ lịch, bác sĩ của lịch, quản trị | Chi tiết, ghi chú bác sĩ, bệnh nhân (họ tên, tuổi), lịch sử thay đổi (vai trò người thao tác, kênh, cũ → mới); dòng `FLAG` chỉ quản trị thấy | FR-APT-05, FR-DOC-03 |
+| `GET /appointments/{id}` (mới) | Chủ lịch, bác sĩ của lịch, quản trị | Chi tiết, ghi chú bác sĩ, bệnh nhân (họ tên, tuổi), lịch sử thay đổi (vai trò người thao tác, kênh, cũ → mới); dòng `FLAG` chỉ quản trị thấy. Khi bác sĩ của lịch xem: `previous_visits` gồm tối đa 5 lần khám trước (Đã khám, Vắng mặt) của bệnh nhân với chính bác sĩ đó | FR-APT-05, FR-DOC-03 |
 | `PATCH /appointments/{id}/reschedule` | Bệnh nhân (còn ≥ 2 giờ), quản trị | Đổi lịch, giữ nguyên mã và dịch vụ; body `{start_at, doctor_id}` | FR-APT-02, FR-ADM-03 |
 | `POST /appointments/{id}/cancel` | Bệnh nhân (còn ≥ 2 giờ), quản trị | Hủy kèm lý do tùy chọn `{reason}` | FR-APT-03, FR-ADM-03 |
 | `PATCH /appointments/{id}/status` | Bác sĩ (lịch của mình, trong ngày), quản trị | Đổi trạng thái theo sơ đồ; body `{status: ARRIVED\|COMPLETED\|NO_SHOW}` | FR-DOC-02, FR-APT-06 |
-| `PATCH /appointments/{id}/note` (mới) | Bác sĩ của lịch | Ghi chú sau khám ≤ 1.000 ký tự | FR-DOC-03 |
+| `PATCH /appointments/{id}/note` (mới) | Bác sĩ của lịch | Ghi chú sau khám ≤ 1.000 ký tự, body `{note}` bắt buộc có trường `note`, rỗng hoặc `null` là xóa (body thiếu trường bị 422, không âm thầm xóa); chỉ khi lịch ARRIVED hoặc COMPLETED (409 `INVALID_TRANSITION`); history `NOTE_UPDATE` không chứa nội dung ghi chú; trả chi tiết lịch | FR-DOC-03 |
 | `POST /appointments/{id}/review` (mới, P2) | Bệnh nhân | Đánh giá lịch đã COMPLETED | FR-RPT-02 |
-| `GET /doctor/schedule?from=&to=` | Bác sĩ | Lịch khám ngày/tuần của chính mình | FR-DOC-01 |
+| `GET /doctor/schedule?date_from=&date_to=` | Bác sĩ | Lịch khám ngày/tuần của chính mình, tối đa 31 ngày: lịch ở mọi trạng thái (họ tên, tuổi, dịch vụ, lý do, có ghi chú hay chưa), giờ làm từng ngày trải từ ca, ngày nghỉ trong khoảng và tối đa 3 ngày nghỉ sắp tới | FR-DOC-01 |
 
 **Quản trị**
 
 | Endpoint | Mô tả | Yêu cầu |
 | --- | --- | --- |
 | `GET/POST/PATCH /admin/specialties`, `/admin/services` | CRUD danh mục, ẩn bằng `is_active` | FR-CAT-01, 02, 05 |
-| `GET/POST/PATCH /admin/doctors`, `PUT /admin/doctors/{id}/services` | Tạo tài khoản bác sĩ, sửa, khóa; gán dịch vụ | FR-ADM-01, FR-CAT-03 |
+| `GET/POST/PATCH /admin/doctors` | Tạo tài khoản bác sĩ (email, mật khẩu ban đầu, chức danh, họ tên, giới tính, chuyên khoa), sửa, khóa (`is_active`); gán dịch vụ bằng `service_ids` trong cùng request, dịch vụ phải thuộc chuyên khoa của bác sĩ; đổi chuyên khoa mà không gửi `service_ids` thì bỏ dịch vụ khác chuyên khoa; email không đổi sau khi tạo | FR-ADM-01, FR-CAT-03 |
 | `GET/POST/PATCH/DELETE /admin/doctors/{id}/shifts` | Ca làm; `?dry_run=true` trả lịch bị ảnh hưởng mà không ghi | FR-ADM-02 |
 | `GET/POST/DELETE /admin/doctors/{id}/time-offs` | Ngày nghỉ; `?dry_run=true` như trên; khi ghi thật thì gắn cờ lịch bị ảnh hưởng | FR-ADM-02, BR-10 |
-| `GET /admin/appointments?date_from=&date_to=&doctor_id=&status=&channel=&needs_attention=` | Mọi lịch hẹn, có lọc | FR-ADM-03 |
-| `PATCH /admin/appointments/{id}/attention` (mới) | Gỡ cờ cần xử lý | FR-ADM-04 |
-| `GET /admin/support-requests?status=`, `PATCH /admin/support-requests/{id}` | Hàng chờ chuyển nhân viên, đánh dấu DONE | FR-ADM-04 |
+| `GET /admin/appointments?date_from=&date_to=&doctor_id=&status=&channel=&needs_attention=&q=&page=&page_size=` | Mọi lịch hẹn, có lọc, xếp theo giờ khám, phân trang; `q` tìm theo mã lịch, họ tên (không dấu) hoặc số điện thoại bệnh nhân; mỗi lịch kèm liên hệ bệnh nhân và `attention_source` | FR-ADM-03 |
+| `PATCH /admin/appointments/{id}/attention` (mới) | Gỡ cờ cần xử lý, hoặc tự gắn cờ cho lịch BOOKED; body `{needs_attention}` | FR-ADM-04 |
+| `GET /admin/support-requests?status=`, `PATCH /admin/support-requests/{id}` | Hàng chờ chuyển nhân viên (đang mở cũ nhất trước) kèm họ tên, số điện thoại, email bệnh nhân và tóm tắt của trợ lý; đánh dấu DONE (ghi người xử lý, thời điểm) hoặc mở lại | FR-ADM-04 |
 | `GET /admin/stats?from=&to=` (P2) | Số liệu dashboard | FR-RPT-01 |
 
 Mọi endpoint `/admin/*` yêu cầu vai trò ADMIN. Quản trị đổi, hủy lịch bằng chính endpoint `/appointments/{id}/…`; service nhận ra vai trò ADMIN để bỏ mốc 2 giờ và ghi kênh ADMIN.
@@ -1603,6 +1607,9 @@ duyệt tay ──── deploy production · smoke test chỉ đọc · rollbac
 | FR-AGT-08, NFR-03 | Decorator `@agent_tool` ghi `tool_call_logs`; log thời gian mỗi lượt | 6.3, 6.7 |
 | FR-AGT-09, NFR-07 | Đếm tin USER trong ngày; `slowapi` + Valkey cho đăng nhập và API chung | 6.1, 4.5 |
 | FR-NTF-01..03 | Outbox `notifications`, worker gửi và thử lại, quét tạo email nhắc | 10.5 |
+| FR-ADM-01, FR-CAT-03 | `/admin/doctors`: tạo tài khoản qua `create_user` của auth, gán dịch vụ cùng chuyên khoa, khóa tài khoản thu hồi phiên | 4.3, 4.6, 8.2 |
+| FR-ADM-03, 04 | `/admin/appointments` có lọc, cờ `needs_attention`, hàng chờ yêu cầu hỗ trợ; đổi, hủy không giới hạn 2 giờ | 5.7, 8.2, 9.3 |
+| FR-DOC-01..03 | `/doctor/schedule`, `PATCH /appointments/{id}/status`, `PATCH /appointments/{id}/note` | 4.6, 5.5, 8.2 |
 | FR-AUTH-02, 03 | Access JWT; refresh token xoay vòng, lưu băm trong `refresh_tokens`, cookie HttpOnly; khóa 15 phút sau 5 lần sai | 4.6, 10.1 |
 | NFR-01, 02 | 3 truy vấn có chỉ mục + tính trong bộ nhớ; đo bằng k6 | 5.1, 7.2 |
 | NFR-05, 12 | Argon2id, secret trong GitHub Environments, gitleaks, Trivy, ruff, mypy, coverage trên CI | 3.4, 11.4, 12 |

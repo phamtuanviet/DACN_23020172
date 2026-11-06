@@ -15,10 +15,13 @@ from app.db.models.catalog import DoctorService, Specialty
 from app.db.models.schedule import Shift
 from app.db.models.users import Doctor, User
 from app.modules.appointments.service import booked_for_doctor, flag_for_attention
+from app.modules.auth.service import update_staff_account
 from app.modules.catalog.schemas import ServiceUpdate, SpecialtyCreate
 from app.modules.catalog.service import CatalogService
 from app.modules.schedule.schemas import ShiftIn
 from app.modules.schedule.service import ScheduleService
+from app.modules.scheduling.service import doctor_calendar
+from tests.conftest import TEST_NOW
 from tests.integration.conftest import MutableClock
 from tests.integration.factories import (
     MONDAY,
@@ -156,13 +159,43 @@ async def test_shared_schedule_helpers_check_the_actor(
     async with db.begin():
         with pytest.raises(AppError) as flag_error:
             await flag_for_attention(
-                db, patient, clinic.doctor_ids[0], [], source={"source": "TEST"}
+                db, patient, clinic.doctor_ids[0], [], source={"source": "TEST"}, now=TEST_NOW
             )
         with pytest.raises(AppError) as read_error:
             await booked_for_doctor(
                 db, patient, clinic.doctor_ids[0], start=local_datetime(MONDAY, time(0))
             )
     assert flag_error.value.code == read_error.value.code == "FORBIDDEN"
+
+
+async def test_shared_account_and_calendar_helpers_check_the_actor(
+    db: AsyncSession, clinic: Clinic
+) -> None:
+    """Hàm dùng chung của auth, scheduling tự kiểm quyền (lớp 2): không đi qua catalog,
+    appointments vẫn bị chặn."""
+    doctor_id = clinic.doctor_ids[0]
+    admin = Actor(clinic.admin_id, UserRole.ADMIN, Channel.WEB)
+    doctor = Actor(doctor_id, UserRole.DOCTOR, Channel.WEB)
+    patient = Actor(clinic.patient_ids[0], UserRole.PATIENT, Channel.AGENT)
+    async with db.begin():
+        # Chỉ quản trị, và chỉ trên tài khoản bác sĩ (không khóa được bệnh nhân, quản trị)
+        for actor, user_id in (
+            (doctor, doctor_id),
+            (patient, doctor_id),
+            (admin, clinic.patient_ids[0]),
+            (admin, clinic.admin_id),
+        ):
+            with pytest.raises(AppError) as account_error:
+                await update_staff_account(db, actor, user_id, is_active=False, now=TEST_NOW)
+            assert account_error.value.code == "FORBIDDEN"
+        # Bác sĩ chỉ xem giờ làm, ngày nghỉ của chính mình
+        other_doctor = Actor(clinic.doctor_ids[1], UserRole.DOCTOR, Channel.WEB)
+        for actor in (other_doctor, admin, patient):
+            with pytest.raises(AppError) as calendar_error:
+                await doctor_calendar(db, actor, doctor_id, MONDAY, MONDAY, TEST_NOW)
+            assert calendar_error.value.code == "FORBIDDEN"
+        own = await doctor_calendar(db, doctor, doctor_id, MONDAY, MONDAY, TEST_NOW)
+    assert len(own.work) == 1
 
 
 async def test_admin_services_refuse_non_admin_actors_when_called_directly(

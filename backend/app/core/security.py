@@ -213,6 +213,7 @@ def actor_with_roles(*roles: UserRole) -> Callable[[CurrentUser], Awaitable[Acto
 ActorDep = Annotated[Actor, Depends(get_actor)]
 AdminActorDep = Annotated[Actor, Depends(actor_with_roles(UserRole.ADMIN))]
 PatientActorDep = Annotated[Actor, Depends(actor_with_roles(UserRole.PATIENT))]
+DoctorActorDep = Annotated[Actor, Depends(actor_with_roles(UserRole.DOCTOR))]
 PatientOrAdminActorDep = Annotated[
     Actor, Depends(actor_with_roles(UserRole.PATIENT, UserRole.ADMIN))
 ]
