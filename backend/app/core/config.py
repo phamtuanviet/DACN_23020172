@@ -55,6 +55,8 @@ class Settings(BaseSettings):
 
     # --- Quy tắc nghiệp vụ (PRD mục 7, các giá trị "đề xuất") ---
     clinic_tz: str = "Asia/Ho_Chi_Minh"
+    clinic_name: str = "Phòng khám DACN"  # tên trong email, giống CLINIC.name của frontend
+    clinic_address: str = ""
     clinic_phone: str = ""
     booking_window_days: int = 30
     change_deadline_hours: int = 2
@@ -82,6 +84,7 @@ class Settings(BaseSettings):
     smtp_user: str | None = None
     smtp_password: SecretStr | None = None
     smtp_starttls: bool = False
+    smtp_timeout_s: int = 15
     mail_from: str = "no-reply@dacn.local"
 
     # --- Quan sát ---

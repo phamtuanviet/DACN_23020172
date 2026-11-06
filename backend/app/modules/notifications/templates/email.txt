@@ -1,0 +1,21 @@
+{#- Bản chữ thuần của cùng email, cho ứng dụng thư không hiện HTML. -#}
+{{ c.heading }}
+
+{{ c.greeting }}
+{{ c.intro }}
+
+{{ c.day }}
+{{ c.time }}{% if c.struck %} (đã hủy){% endif %}
+{{ c.what }}
+{% if c.address %}{{ c.address }}
+{% endif %}Mã lịch hẹn: {{ c.code }}
+{% for link in c.links %}
+{{ link.label }}: {{ link.url }}
+{%- endfor %}
+{% for note in c.notes %}
+{% if c.as_list %}- {% endif %}{{ note }}
+{%- endfor %}
+
+--
+{{ c.footer }}
+Email tự động, vui lòng không trả lời.

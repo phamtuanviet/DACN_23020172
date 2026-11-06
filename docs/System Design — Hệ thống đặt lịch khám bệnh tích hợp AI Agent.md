@@ -255,7 +255,7 @@ Mũi tên nghĩa là "gọi hàm của". Quy tắc: không có vòng phụ thu�
 
 | Thành phần | Nội dung |
 | --- | --- |
-| `config.py` | `pydantic-settings` đọc biến môi trường và file secret trong `/run/secrets`; `APP_ENV` (development, staging, production) quyết định các mặc định an toàn: production tắt `/docs`, chặn seed, bắt buộc có đủ secret khi khởi động. Gom mọi tham số "đề xuất" của PRD (30 ngày, 2 giờ, 3 lịch, 10 phút, 50 tin nhắn, 24 giờ) để đổi không cần sửa code |
+| `config.py` | `pydantic-settings` đọc biến môi trường và file secret trong `/run/secrets`; `APP_ENV` (development, staging, production) quyết định các mặc định an toàn: production tắt `/docs`, chặn seed, bắt buộc có đủ secret khi khởi động. Gom mọi tham số "đề xuất" của PRD (30 ngày, 2 giờ, 3 lịch, 10 phút, 50 tin nhắn, 24 giờ) để đổi không cần sửa code; tên, địa chỉ, số điện thoại phòng khám (`CLINIC_NAME`, `CLINIC_ADDRESS`, `CLINIC_PHONE`) hiện trong email |
 | `db.py` | Async engine, pool mỗi tiến trình 4 + overflow 2, `pool_pre_ping`, kết nối TLS; tổng kết nối của mọi replica được tính để nằm dưới giới hạn của database managed (mục 11.2). Một `AsyncSession` mỗi request. `transaction()` là ranh giới transaction của một thao tác service; bên trong `outer_transaction()` nó chạy trong SAVEPOINT, để xác nhận đề xuất của Agent khóa đề xuất, đặt lịch và đánh dấu đề xuất trong cùng một transaction (mục 6.4) |
 | `security.py` | Argon2id; tạo và kiểm tra JWT (PyJWT, HS256, có `kid` để xoay khóa); tạo, xoay vòng, thu hồi refresh token; dependency `current_user`, `require_roles(...)` |
 | `errors.py` | `AppError(code, message, status, details)`; handler chuyển mọi lỗi về dạng `{code, message, details}`; ánh xạ SQLSTATE `23P01` theo tên constraint |
@@ -1194,12 +1194,23 @@ sequenceDiagram
 
 | Job của worker | Chu kỳ | Việc làm |
 | --- | --- | --- |
-| `send_notifications` | 30 giây | Như sơ đồ trên; mỗi email một transaction ngắn. Gửi tối đa 4 lần (lần đầu + 3 lần thử lại cách nhau 1, 5, 15 phút), sau đó chuyển `FAILED` và báo cho quản trị (FR-NTF-03). Nội dung dựng từ mẫu Jinja2 cho 4 loại email (SRS 7.4), gửi bằng `aiosmtplib` tới SMTP của Amazon SES (cổng 587, STARTTLS) |
+| `send_notifications` | 30 giây | Như sơ đồ trên; mỗi email một transaction ngắn. Gửi tối đa 4 lần (lần đầu + 3 lần thử lại cách nhau 1, 5, 15 phút), sau đó chuyển `FAILED` và ghi log lỗi `notification.failed`; Grafana cảnh báo từ log này qua Loki (mục 11.7) (FR-NTF-03). Nội dung dựng từ mẫu Jinja2 (`notifications/templates`, bản HTML và bản chữ thuần) cho 4 loại email (SRS 7.4, thiết kế S-email), gửi bằng `aiosmtplib` tới SMTP của Amazon SES (cổng 587, STARTTLS) |
 | `enqueue_reminders` | 5 phút | Thêm email `REMINDER` cho lịch BOOKED bắt đầu trong 24 giờ tới và được tạo sớm hơn 24 giờ trước giờ khám; `ON CONFLICT DO NOTHING` dựa trên unique index một-nhắc-mỗi-lịch (FR-NTF-02) |
 | `expire_proposals` | 1 phút | Chuyển đề xuất PENDING đã quá `expires_at` sang EXPIRED |
 | `purge_expired` | Hằng ngày 03:00 | Xóa refresh token hết hạn quá 30 ngày và hội thoại quá `CHAT_RETENTION_DAYS` ngày (mục 7.7) |
 
-Email nhắc được tạo bằng cách quét định kỳ thay vì tạo sẵn lúc đặt lịch, vì enum `notification_status` không có trạng thái "hủy": lịch bị hủy hoặc dời trước giờ nhắc tự nhiên không còn khớp điều kiện quét, không phải sửa hay xóa dòng nào trong hàng đợi. Lịch đặt sát giờ (dưới 24 giờ) đã có email xác nhận nên không nhắc thêm. Các job đều idempotent: worker khởi động lại hay chạy trễ cũng không gửi trùng. Job quét (`enqueue_reminders`, `expire_proposals`, `purge_expired`) lấy `pg_try_advisory_lock` trước khi chạy, nên dù có nhiều replica worker thì mỗi lượt chỉ một replica thực hiện; job gửi email dùng `SKIP LOCKED` nên các replica chia nhau hàng đợi. Tuổi của email chờ lâu nhất là một metric có cảnh báo khi vượt 10 phút (mục 11.7).
+Email nhắc được tạo bằng cách quét định kỳ thay vì tạo sẵn lúc đặt lịch, vì enum `notification_status` không có trạng thái "hủy": lịch bị hủy hoặc dời trước giờ nhắc tự nhiên không còn khớp điều kiện quét, không phải sửa hay xóa dòng nào trong hàng đợi. Lịch đặt sát giờ (dưới 24 giờ) đã có email xác nhận nên không nhắc thêm. Các job đều idempotent: worker khởi động lại hay chạy trễ cũng không gửi trùng. Job quét (`enqueue_reminders`, `expire_proposals`, `purge_expired`) lấy `pg_try_advisory_lock` trước khi chạy, nên dù có nhiều replica worker thì mỗi lượt chỉ một replica thực hiện; job gửi email dùng `SKIP LOCKED` nên các replica chia nhau hàng đợi. Tuổi của email chờ lâu nhất là một metric có cảnh báo khi vượt 10 phút (mục 11.7); trước khi có metric, job ghi log cảnh báo `notification.backlog`.
+
+Nội dung email dựng lúc gửi từ trạng thái hiện tại của lịch hẹn: thời gian, dịch vụ, bác sĩ, mã lịch, mốc đổi/hủy trực tuyến (giờ khám − 2 giờ), liên kết tới `PUBLIC_BASE_URL/me/appointments?id=`. Email không chứa lý do khám hay ghi chú của bác sĩ (dữ liệu sức khỏe). Email cũng không chứa họ tên ("Chào bạn,"): email đăng ký chưa được xác minh, nên không đưa chữ do người đăng ký tự đặt vào thư mang tên phòng khám gửi tới một địa chỉ có thể là của người khác. Email đổi, hủy cho biết người thực hiện là phòng khám khi dòng history gần nhất có kênh ADMIN (FR-NTF-01). Một số email không gửi mà đánh `FAILED` với `attempts = 0` và lý do ở `last_error`, để phân biệt với gửi lỗi thật:
+
+- địa chỉ không đúng dạng chữ Latin, số và `._+-` (dữ liệu có từ trước khi siết kiểm tra lúc đăng ký): thư viện SMTP có thể rút ra một người nhận khác, ví dụ `n3<victim@y.com>` thành `victim@y.com`;
+- ngoài development, địa chỉ thuộc tên miền `.local` (tài khoản demo);
+- email chờ quá 24 giờ chưa gửi: nội dung đã cũ, và hàng đợi tồn từ trước khi bật worker không bị gửi dồn. Đầu mỗi lượt, một câu `UPDATE` bỏ hết các email này (dòng đang bị worker khác giữ thì bỏ qua bằng `SKIP LOCKED`) để sau một lần worker ngừng lâu, thư mới không phải xếp sau hàng tồn;
+- email nhắc của lịch không còn BOOKED hoặc đã qua giờ khám;
+- đã gửi 5 email trong 1 giờ tới cùng địa chỉ: một tài khoản đặt, hủy liên tục không biến phòng khám thành nguồn gửi thư hàng loạt. Không áp cho email nhắc (mỗi lịch một lần, mỗi bệnh nhân tối đa 3 lịch chờ khám) và email phòng khám đổi, hủy lịch. Rủi ro còn lại: địa chỉ dạng `ten+1@`, `ten+2@` về cùng một hộp thư nhưng được đếm riêng, cho tới khi có xác minh email;
+- tài khoản đã ẩn danh.
+
+Email lẽ ra phải tới bệnh nhân mà bị bỏ (chờ quá 24 giờ, địa chỉ sai dạng, chạm hạn mức theo địa chỉ) ghi log cảnh báo `notification.dropped` kèm mã lý do ở khóa `code` (khóa `reason` bị bộ lọc log che); các trường hợp còn lại chỉ ghi log thông tin. Log chỉ ghi id, loại email, số lần thử và tên lớp lỗi. Cột `last_error` cũng chỉ lưu tên lớp lỗi và mã SMTP, vì thông báo lỗi SMTP hay nhắc lại địa chỉ người nhận. Phong bì SMTP ghi rõ người gửi và đúng một người nhận, không để thư viện tự rút từ header `To`.
 
 ### 10.6 Ma trận đọc/ghi dữ liệu theo use case
 
@@ -1560,7 +1571,7 @@ Mỗi tiêu chí nghiệm thu P0 có ít nhất một test tự động; test ba
 | Tầng | Công cụ | Phạm vi | Kiểm chứng |
 | --- | --- | --- | --- |
 | Unit | pytest | `compute_slots` (ranh giới ca, khoảng `[)`, ngày nghỉ, lịch sát nhau, khung đã qua, cửa sổ 30 ngày, thời lượng 10–120 phút, lọc buổi); state machine; policy phân quyền; sinh mã lịch hẹn | AC-02, FR-SCH-01..05, FR-APT-06 |
-| Integration | pytest + PostgreSQL | Exclusion constraint, đổi lịch rollback, khóa BR-09, gắn cờ khi thêm ngày nghỉ, outbox email, đề xuất hết hạn và dùng một lần; xoay vòng và thu hồi refresh token; giới hạn tốc độ qua Valkey | AC-04, AC-08, AC-13, NFR-09 |
+| Integration | pytest + PostgreSQL | Exclusion constraint, đổi lịch rollback, khóa BR-09, gắn cờ khi thêm ngày nghỉ, outbox email, đề xuất hết hạn và dùng một lần; xoay vòng và thu hồi refresh token; giới hạn tốc độ qua Valkey; quản trị tạo, khóa bác sĩ và danh mục mới có khung trống ngay; lịch khám, ghi chú của bác sĩ; danh sách, hàng chờ của quản trị; worker email với SMTP giả (gửi, thử lại 1/5/15 phút rồi `FAILED`, bỏ qua `.local`, email nhắc, hai worker không gửi trùng) | AC-04, AC-07, AC-08, AC-09, AC-13, AC-16, AC-17, NFR-09 |
 | Đồng thời | pytest + `asyncio.gather`, mỗi request một kết nối | 20 request đặt cùng khung → đúng 1 thành công, 19 nhận `SLOT_TAKEN` | AC-03, NFR-04 |
 | API, phân quyền | httpx `AsyncClient` | Duyệt tự động mọi route trong `app.routes`: thiếu token → 401, sai vai trò → 403; bệnh nhân A thao tác lịch của B → 403; quá giới hạn → 429 | AC-05, AC-06, NFR-06, NFR-07 |
 | Frontend | Vitest + Testing Library | Bộ chọn khung giờ, ProposalCard (đếm ngược, khóa nút), ánh xạ mã lỗi, đọc sự kiện SSE | SRS 7.1 |
