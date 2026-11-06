@@ -1,13 +1,15 @@
 """Luồng tài khoản trên PostgreSQL thật: FR-AUTH-01..06, NFR-05..07, docs mục 4.6."""
 
+import asyncio
 from datetime import timedelta
 from typing import Any
 
 import pytest
 from httpx import AsyncClient, Response
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import hash_refresh_token
 from app.db.enums import UserRole
 from app.db.models.users import RefreshToken, User
 from app.modules.auth.service import create_user
@@ -272,3 +274,91 @@ async def test_guessing_current_password_locks_the_account(app_client: AsyncClie
     locked_login = await login(app_client, "lan@example.com", PASSWORD)
     assert locked_login.status_code == 429
     assert locked_login.json()["code"] == "ACCOUNT_LOCKED"
+
+
+async def wait_for_lock_waiters(db: AsyncSession, count: int) -> None:
+    """Chờ đến khi đủ `count` kết nối đang đợi khóa, tối đa 5 giây. Đọc pg_locks vì pg_stat_activity
+    chỉ chụp một lần cho cả transaction đang mở."""
+    stmt = text("SELECT count(DISTINCT pid) FROM pg_locks WHERE NOT granted")
+    for _ in range(100):
+        if (await db.execute(stmt)).scalar_one() >= count:
+            return
+        await asyncio.sleep(0.05)
+    raise AssertionError(f"không thấy {count} kết nối đang chờ khóa")
+
+
+async def test_refresh_racing_a_password_change_leaves_no_live_old_token(
+    app_client: AsyncClient, db: AsyncSession
+) -> None:
+    """Kẻ giữ token cũ refresh đúng lúc chủ tài khoản đổi mật khẩu: token vừa xoay vòng cũng bị
+    thu hồi. Mọi luồng của auth khóa users trước refresh_tokens, nên đổi mật khẩu chờ lượt refresh
+    commit rồi mới quét."""
+    registered = await register(app_client)
+    stolen = refresh_cookie(registered)
+    user_id = registered.json()["user"]["id"]
+    async with db.begin():
+        # Một kết nối khác giữ khóa dòng của token: lượt refresh bị chặn giữa chừng
+        await db.execute(
+            select(RefreshToken.id)
+            .where(RefreshToken.token_hash == hash_refresh_token(stolen))
+            .with_for_update()
+        )
+        racing = asyncio.create_task(refresh(app_client, stolen))
+        await wait_for_lock_waiters(db, 1)
+        changing = asyncio.create_task(
+            app_client.post(
+                "/api/v1/me/password",
+                json={"current_password": PASSWORD, "new_password": NEW_PASSWORD},
+                headers=bearer(registered),
+            )
+        )
+        await wait_for_lock_waiters(db, 2)
+    rotated, changed = await asyncio.gather(racing, changing)
+
+    assert (rotated.status_code, changed.status_code) == (200, 200)
+    live = await db.execute(
+        select(RefreshToken.token_hash).where(
+            RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None)
+        )
+    )
+    assert live.scalars().all() == [hash_refresh_token(refresh_cookie(changed))]
+    await db.commit()
+
+
+async def test_rotated_token_cannot_outlive_a_password_change_or_logout(
+    app_client: AsyncClient,
+) -> None:
+    """Khoảng ân hạn 30 giây chỉ dành cho tab thứ hai khi token kế tiếp còn sống: kẻ giữ token
+    vừa xoay không lấy lại được phiên sau khi chủ đổi mật khẩu hay đăng xuất."""
+    registered = await register(app_client)
+    stolen = refresh_cookie(registered)
+    assert (await refresh(app_client, stolen)).status_code == 200
+    changed = await app_client.post(
+        "/api/v1/me/password",
+        json={"current_password": PASSWORD, "new_password": NEW_PASSWORD},
+        headers=bearer(registered),
+    )
+    assert changed.status_code == 200
+    assert (await refresh(app_client, stolen)).status_code == 401
+
+    other = refresh_cookie(await login(app_client, "lan@example.com", NEW_PASSWORD))
+    current = refresh_cookie(await refresh(app_client, other))
+    app_client.cookies.clear()
+    logged_out = await app_client.post(
+        "/api/v1/auth/logout", headers={"Cookie": f"refresh_token={current}"}
+    )
+    assert logged_out.status_code == 204
+    assert (await refresh(app_client, other)).status_code == 401
+
+
+async def test_logout_ends_the_whole_session_family(app_client: AsyncClient) -> None:
+    """Đăng xuất thu hồi cả family: token tab khác vừa nhận trong khoảng ân hạn cũng hết dùng."""
+    first = refresh_cookie(await register(app_client))
+    current = refresh_cookie(await refresh(app_client, first))  # tab A xoay token
+    sibling = refresh_cookie(await refresh(app_client, first))  # tab B gửi lại token vừa xoay
+    app_client.cookies.clear()
+    logged_out = await app_client.post(
+        "/api/v1/auth/logout", headers={"Cookie": f"refresh_token={current}"}
+    )
+    assert logged_out.status_code == 204
+    assert (await refresh(app_client, sibling)).status_code == 401

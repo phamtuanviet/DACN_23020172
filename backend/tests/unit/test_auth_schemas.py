@@ -65,3 +65,31 @@ def test_invalid_email_rejected_with_vietnamese_message() -> None:
     with pytest.raises(ValidationError) as error:
         RegisterRequest.model_validate(_payload(email="lan.example.com"))
     assert _messages(error.value) == ["Email không hợp lệ."]
+
+
+@pytest.mark.parametrize(
+    "email",
+    [
+        "n1,victim@y.com",
+        "n3<victim@y.com>",
+        '"victim"@y.com',
+        "victim@y.com.",
+        "a b@y.com",
+        "a%b@y.com",
+    ],
+)
+def test_email_that_could_turn_into_several_recipients_is_rejected(email: str) -> None:
+    """Địa chỉ chứa dấu phẩy, <, nháy kép… thành danh sách người nhận khi gửi thư."""
+    with pytest.raises(ValidationError):
+        RegisterRequest.model_validate(_payload(email=email))
+    accepted = RegisterRequest.model_validate(_payload(email="Lan.Nguyen+kham@Mail-1.example.vn"))
+    assert accepted.email == "lan.nguyen+kham@mail-1.example.vn"
+
+
+def test_plain_email_check_matches_the_whole_string() -> None:
+    """`$` của regex khớp cả trước ký tự xuống dòng cuối; kiểm tra phải so khớp cả chuỗi."""
+    from app.core.validation import is_plain_email
+
+    assert is_plain_email("lan@demo.local")
+    assert not is_plain_email("lan@demo.local\n")
+    assert not is_plain_email("LAN@demo.local")  # gọi sau khi đã đổi về chữ thường

@@ -194,15 +194,25 @@ class AuthService:
         now = self._clock.now()
         error: AppError | None = None
         issued: IssuedSession | None = None
+        token_hash = hash_refresh_token(raw_token)
         async with self._session.begin():
-            token = await repo.get_refresh_token_for_update(
-                self._session, hash_refresh_token(raw_token)
-            )
+            # Khóa users trước token như mọi luồng khác của auth: đổi mật khẩu, khóa tài khoản chạy
+            # cùng lúc sẽ chờ lượt này commit rồi mới thu hồi, nên thu hồi được cả token vừa cấp.
+            owner = await repo.refresh_token_owner(self._session, token_hash)
+            if owner is not None:
+                await repo.get_user(self._session, owner, for_update=True)
+            token = await repo.get_refresh_token_for_update(self._session, token_hash)
             if token is None or token.expires_at <= now:
                 error = session_expired()
             elif token.revoked_at is not None:
+                # Ân hạn cho tab thứ hai gửi lại token vừa xoay, chỉ khi token kế tiếp còn sống:
+                # đổi mật khẩu, đăng xuất, khóa tài khoản đã thu hồi cả family thì không cấp lại.
                 rotated_moments_ago = (
-                    token.replaced_by is not None and now - token.revoked_at <= REUSE_GRACE
+                    token.replaced_by is not None
+                    and now - token.revoked_at <= REUSE_GRACE
+                    and await repo.family_has_live_token(
+                        self._session, token.user_id, token.family_id, now
+                    )
                 )
                 if rotated_moments_ago:
                     issued = await self._issue_for_family(token, client, now)
@@ -224,16 +234,22 @@ class AuthService:
         return issued
 
     async def logout(self, raw_token: str | None) -> None:
-        """Thu hồi refresh token hiện tại; gọi nhiều lần vẫn an toàn."""
+        """Đăng xuất phiên trên thiết bị này: thu hồi cả family của token, gồm token tab khác vừa
+        nhận trong khoảng ân hạn, kể cả khi token gửi lên đã bị xoay. Gọi nhiều lần vẫn an toàn."""
         if not raw_token:
             return
         now = self._clock.now()
+        token_hash = hash_refresh_token(raw_token)
         async with self._session.begin():
-            token = await repo.get_refresh_token_for_update(
-                self._session, hash_refresh_token(raw_token)
-            )
-            if token is not None and token.revoked_at is None:
-                token.revoked_at = now
+            # Khóa users trước token như refresh: không deadlock, và một lượt refresh chạy cùng
+            # lúc không để lại token mới còn sống.
+            owner = await repo.refresh_token_owner(self._session, token_hash)
+            if owner is None:
+                return
+            await repo.get_user(self._session, owner, for_update=True)
+            token = await repo.get_refresh_token_for_update(self._session, token_hash)
+            if token is not None:
+                await repo.revoke_family(self._session, token.family_id, now)
 
     async def get_me(self, actor: Actor) -> MeResponse:
         async with self._session.begin():

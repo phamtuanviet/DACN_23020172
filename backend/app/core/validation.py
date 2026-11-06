@@ -4,8 +4,11 @@ tính ngày giờ báo lỗi 500 (lỗi 500 còn sinh event Sentry và traceback
 - Id: cột bigint của PostgreSQL, số lớn hơn 2^63 − 1 làm truy vấn lỗi NumericValueOutOfRange.
 - Chuỗi: PostgreSQL không lưu được ký tự NUL (0x00).
 - Ngày: giữ trong khoảng hợp lý để phép cộng ngày, đổi múi giờ không tràn năm 1 hay năm 9999.
+- Email: chỉ chữ Latin, số và ._+- trước @. Dấu phẩy, <, >, nháy kép… biến một địa chỉ thành
+  danh sách người nhận khi gửi thư; auth chặn lúc đăng ký, notifications kiểm lại trước khi gửi.
 """
 
+import re
 from datetime import date, datetime
 from typing import Annotated
 
@@ -15,6 +18,12 @@ from pydantic_core import PydanticCustomError
 MAX_ID = 2**63 - 1
 MIN_DATE = date(2000, 1, 1)
 MAX_DATE = date(2100, 12, 31)
+_PLAIN_EMAIL = re.compile(r"[a-z0-9._+-]+@(?:[a-z0-9-]+\.)+[a-z0-9-]{2,}")
+
+
+def is_plain_email(value: str) -> bool:
+    """Email dạng chữ thường chỉ gồm ký tự an toàn (so khớp cả chuỗi, kể cả xuống dòng cuối)."""
+    return _PLAIN_EMAIL.fullmatch(value) is not None
 
 
 def no_nul(value: str) -> str:

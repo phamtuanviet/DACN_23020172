@@ -11,17 +11,16 @@ from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, Field, field_validator
 from pydantic_core import PydanticCustomError
 
-from app.core.validation import no_nul
+from app.core.validation import is_plain_email, no_nul
 from app.db.enums import Gender, UserRole
 
-_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _PHONE = re.compile(r"^0\d{9}$")
 PASSWORD_MIN_LENGTH = 8
 
 
 def _email(value: str) -> str:
     value = no_nul(value).strip().lower()
-    if not _EMAIL.match(value):
+    if not is_plain_email(value):
         raise PydanticCustomError("email", "Email không hợp lệ.")
     return value
 
