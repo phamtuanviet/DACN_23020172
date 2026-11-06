@@ -1576,7 +1576,7 @@ Mỗi tiêu chí nghiệm thu P0 có ít nhất một test tự động; test ba
 | Đồng thời | pytest + `asyncio.gather`, mỗi request một kết nối | 20 request đặt cùng khung → đúng 1 thành công, 19 nhận `SLOT_TAKEN` | AC-03, NFR-04 |
 | API, phân quyền | httpx `AsyncClient` | Duyệt tự động mọi route trong `app.routes`: thiếu token → 401, sai vai trò → 403; bệnh nhân A thao tác lịch của B → 403; quá giới hạn → 429 | AC-05, AC-06, NFR-06, NFR-07 |
 | Frontend | Vitest + Testing Library | Bộ chọn khung giờ, ProposalCard (đếm ngược, khóa nút), ánh xạ mã lỗi, đọc sự kiện SSE | SRS 7.1 |
-| E2E | Playwright | Đăng ký → đặt lịch → thấy trong "Sắp tới"; đổi, hủy; bác sĩ xem lịch; quản trị thêm ca; chạy cả viewport 360 px | AC-01, AC-07, AC-09, NFR-11 |
+| E2E | Playwright | Đăng ký → đặt lịch → thấy trong "Sắp tới"; đổi, hủy; quản trị tạo chuyên khoa, dịch vụ, bác sĩ, ca làm rồi bệnh nhân đặt được ngay; thêm ngày nghỉ thấy lịch bị ảnh hưởng, hủy từ hàng chờ; bác sĩ xem lịch ngày, tuần, đánh dấu đã đến, ghi chú, đã khám; chạy cả viewport 360 px | AC-01, AC-07, AC-08, AC-09, AC-17, NFR-11 |
 | Agent | Bộ kịch bản YAML + LLM thật, đồng hồ cố định | 30–50 kịch bản: đặt, đổi, hủy, hết khung, triệu chứng, ngoài phạm vi, prompt injection | AC-10..15, NFR-08 |
 | Hiệu năng | k6 trên staging, 20 người dùng ảo trong 5 phút, đi qua Cloudflare và Caddy | `/availability` và các API đọc chính | NFR-01, NFR-02 |
 | Người dùng thật | 5–10 người thử, bấm giờ | Đặt lịch lần đầu trên web; làm cùng tác vụ bằng Agent để so sánh | NFR-10, AC-20 |

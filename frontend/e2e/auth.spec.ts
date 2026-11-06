@@ -70,23 +70,10 @@ test("chưa đăng nhập mở trang bệnh nhân thì sang đăng nhập, xong 
   await expect(page.getByRole("heading", { name: "Lịch của tôi" })).toBeVisible();
 });
 
-test("bác sĩ đăng nhập vào khu vực bác sĩ và đăng xuất được", async ({ page }) => {
-  await page.goto("/login");
-  await login(page, "minh.tran@demo.local", DEMO_PASSWORD);
-  await expect(page).toHaveURL(/\/doctor\/schedule$/);
-  await expect(page.getByRole("heading", { name: "Lịch khám" })).toBeVisible();
-
-  const logoutButton = page.getByRole("button", { name: "Đăng xuất" });
-  if (!(await logoutButton.isVisible()))
-    await page.getByRole("button", { name: "Mở menu" }).click();
-  await logoutButton.click();
-  await expect(page).toHaveURL(/\/login$/);
-
-  await page.goto("/doctor/schedule");
-  await expect(page).toHaveURL(/\/login\?next=%2Fdoctor%2Fschedule$/);
-});
-
-test("bệnh nhân mở trang quản trị thấy thông báo không có quyền", async ({ page }) => {
+// Bác sĩ đăng nhập, đăng xuất: e2e/staff.spec.ts (cùng luồng lịch khám, để bớt lượt đăng nhập).
+test("bệnh nhân mở trang quản trị thấy thông báo không có quyền", async ({ page }, testInfo) => {
+  // Chặn theo vai trò không phụ thuộc bố cục; /auth/login giới hạn 10 lần/phút/IP.
+  test.skip(testInfo.project.name !== "desktop", "chỉ chạy trên máy tính");
   await page.goto("/login");
   await login(page, "lan@demo.local", DEMO_PASSWORD);
   await expect(page).toHaveURL(/\/me\/appointments$/);

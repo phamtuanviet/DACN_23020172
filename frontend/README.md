@@ -40,7 +40,11 @@ npm ci
 npm run dev          # http://localhost:3000, /api/* chuyển tới backend :8000
 npm run lint && npm run typecheck && npm test
 npm run e2e          # Playwright; E2E_BASE_URL=https://staging... để chạy trên staging
-E2E_FAKE_LLM=1 npm run e2e   # thêm e2e khung chat; backend chạy LLM_PROVIDER=fake (không tốn phí LLM)
+E2E_FAKE_LLM=1 npx playwright test e2e/agent.spec.ts   # e2e khung chat; backend chạy LLM_PROVIDER=fake
 ```
+
+Bộ e2e dùng dữ liệu seed và vừa khít giới hạn tốc độ của backend (đăng ký 5 lần/phút/IP, đăng nhập
+10 lần/phút/IP), nên chạy khung chat riêng như trên và đợi một phút giữa hai lần chạy cả bộ. Trên
+staging, truyền mật khẩu tài khoản demo qua `E2E_DEMO_PASSWORD`.
 
 Thêm component shadcn/ui khi cần: `npx shadcn@latest add button` (đặt vào `src/shared/ui`).
