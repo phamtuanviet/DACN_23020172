@@ -1,10 +1,14 @@
 // Định dạng giá, thời lượng, chữ viết tắt của họ tên.
 
-const PRICE = new Intl.NumberFormat("vi-VN");
+const INTEGER = new Intl.NumberFormat("vi-VN"); // 1284 → "1.284"
+const ONE_DECIMAL = new Intl.NumberFormat("vi-VN", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
 
 /** 250000 → "250.000 ₫" */
 export function formatPrice(vnd: number): string {
-  return `${PRICE.format(vnd)} ₫`;
+  return `${INTEGER.format(vnd)} ₫`;
 }
 
 export function formatDuration(minutes: number): string {
@@ -50,4 +54,19 @@ export function splitScope(scope: string): { included: string; excluded: string 
       .replace(/^Không gồm:?\s*/i, "")
       .trim(),
   };
+}
+
+/** Điểm đánh giá: 4.8 → "4,8" */
+export function formatRating(value: number): string {
+  return ONE_DECIMAL.format(value);
+}
+
+/** Tỷ lệ 0–1 → "8,1%" (một chữ số thập phân). */
+export function formatPercent(ratio: number): string {
+  return `${ONE_DECIMAL.format(ratio * 100)}%`;
+}
+
+/** 1284 → "1.284" */
+export function formatCount(value: number): string {
+  return INTEGER.format(value);
 }

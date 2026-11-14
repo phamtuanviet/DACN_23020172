@@ -1,5 +1,6 @@
 // Chỉ dùng trong client component. Chi tiết lịch hẹn (P-appts, cột phải): giờ, dịch vụ, bác sĩ,
-// lý do, nút đổi/hủy kèm hạn 2 giờ (BR-08), ghi chú bác sĩ (FR-DOC-03), lịch sử thay đổi (FR-APT-05).
+// lý do, nút đổi/hủy kèm hạn 2 giờ (BR-08), ghi chú bác sĩ (FR-DOC-03), đánh giá buổi khám
+// (FR-RPT-02), lịch sử thay đổi (FR-APT-05).
 import Link from "next/link";
 import { useState } from "react";
 
@@ -18,19 +19,23 @@ import { CLINIC, TEXT } from "@/shared/texts";
 import { Alert } from "@/shared/ui/alert";
 import { StatusBadge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { Stars } from "@/shared/ui/rating";
 
 const T = TEXT.appointments;
+
+type Actions = {
+  onReschedule: (appointment: Appointment) => void;
+  onCancel: (appointment: Appointment) => void;
+  onReview: (appointment: Appointment) => void;
+};
 
 export function AppointmentDetail({
   id,
   backHref,
-  onReschedule,
-  onCancel,
-}: {
+  ...actions
+}: Actions & {
   id: number;
   backHref: string;
-  onReschedule: (appointment: Appointment) => void;
-  onCancel: (appointment: Appointment) => void;
 }) {
   const query = useAppointment(id);
 
@@ -61,21 +66,13 @@ export function AppointmentDetail({
           </Button>
         </div>
       ) : (
-        <DetailBody detail={query.data} onReschedule={onReschedule} onCancel={onCancel} />
+        <DetailBody detail={query.data} {...actions} />
       )}
     </section>
   );
 }
 
-function DetailBody({
-  detail,
-  onReschedule,
-  onCancel,
-}: {
-  detail: Detail;
-  onReschedule: (appointment: Appointment) => void;
-  onCancel: (appointment: Appointment) => void;
-}) {
+function DetailBody({ detail, onReschedule, onCancel, onReview }: Actions & { detail: Detail }) {
   const [now] = useState(() => Date.now());
   const upcoming = detail.status === "BOOKED" && Date.parse(detail.start_at) > now;
   const rows: [string, string][] = [
@@ -141,6 +138,26 @@ function DetailBody({
           {detail.doctor_note || T.noDoctorNote}
         </p>
       </div>
+
+      {detail.review ? (
+        <div className="flex flex-col gap-1.5 border-t border-divider pt-4">
+          <h2 className="font-semibold">{T.yourReview}</h2>
+          <Stars value={detail.review.rating} />
+          {detail.review.comment ? (
+            <p className="whitespace-pre-line">{detail.review.comment}</p>
+          ) : null}
+          <span className="text-sm text-muted">
+            {T.reviewedAt(formatStamp(detail.review.created_at))}
+          </span>
+        </div>
+      ) : detail.can_review ? (
+        <div className="flex flex-col items-start gap-2.5 rounded-[10px] bg-primary-soft px-4 py-3 text-primary-ink">
+          <p className="text-[15px]">{T.reviewPrompt}</p>
+          <Button size="sm" onClick={() => onReview(detail)}>
+            {T.reviewOpen}
+          </Button>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-2 border-t border-divider pt-4">
         <h2 className="font-semibold">{T.historyTitle}</h2>

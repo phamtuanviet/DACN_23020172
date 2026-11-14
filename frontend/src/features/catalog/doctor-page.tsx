@@ -1,5 +1,5 @@
-// Hồ sơ bác sĩ (G-doctor, UC03): hồ sơ, lịch làm việc render phía server; chọn dịch vụ và giờ trống
-// 7 ngày tới là client component (DoctorBooking).
+// Hồ sơ bác sĩ (G-doctor, UC03): hồ sơ, điểm đánh giá (FR-RPT-03), lịch làm việc render phía server;
+// chọn dịch vụ và giờ trống 7 ngày tới là client component (DoctorBooking).
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import type { DoctorDetail } from "@/shared/api/types";
 import { TEXT } from "@/shared/texts";
 import { Avatar } from "@/shared/ui/avatar";
+import { RatingSummary } from "@/shared/ui/rating";
 
 import { getDoctor, searchDoctors } from "./api";
 import { DoctorBooking } from "./doctor-booking";
@@ -86,6 +87,11 @@ function ProfileCard({ doctor }: { doctor: DoctorDetail }) {
           <span className="text-muted">
             {doctor.specialty.name} · {TEXT.doctor.genders[doctor.gender]}
           </span>
+          <RatingSummary
+            average={doctor.rating_average}
+            count={doctor.rating_count}
+            className="text-sm"
+          />
         </div>
       </div>
       {doctor.bio ? <p className="text-subtle">{doctor.bio}</p> : null}

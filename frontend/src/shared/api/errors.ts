@@ -29,6 +29,7 @@ const MESSAGES: Record<string, string> = {
   SLOT_TAKEN: "Khung giờ vừa được người khác đặt, vui lòng chọn khung khác.",
   PATIENT_OVERLAP: "Bạn đã có một lịch hẹn khác trùng giờ này.",
   MAX_ACTIVE_APPOINTMENTS: "Bạn đã có 3 lịch đang chờ khám.",
+  ALREADY_REVIEWED: "Lịch hẹn này đã được đánh giá, mỗi lịch chỉ đánh giá một lần.",
   // Không dịch lại, dùng message của backend vì cụ thể hơn: SHIFT_OVERLAP (nêu ca bị chồng),
   // CHANGE_DEADLINE_PASSED (kèm số điện thoại phòng khám), INVALID_TRANSITION (nêu trạng thái).
   AGENT_UNAVAILABLE: "Trợ lý tạm thời không hoạt động, bạn vẫn đặt lịch được trên trang Đặt lịch.",

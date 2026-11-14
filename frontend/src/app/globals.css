@@ -43,6 +43,12 @@
   --color-noshow-soft: #fce8e6;
   --color-noshow: #a3261c;
 
+  /* Biểu đồ dashboard: 1 = Web (và mọi biểu đồ một chuỗi), 2 = Trợ lý. Cặp màu đã qua bộ kiểm tra
+     của dataviz (phân biệt khi mù màu, tương phản ≥ 3:1 trên nền trắng); không dùng màu trạng thái. */
+  --color-chart-1: #0a9488;
+  --color-chart-2: #6250d6;
+  --color-star: #b57a00; /* sao đánh giá, tương phản 3,6:1 trên nền trắng */
+
   --radius-control: 8px;
   --radius-card: 12px;
 }

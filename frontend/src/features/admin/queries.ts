@@ -22,6 +22,7 @@ import type {
   ServiceAdmin,
   Shift,
   SpecialtyAdmin,
+  Stats,
   SupportRequest,
   TimeOff,
 } from "@/shared/api/types";
@@ -343,5 +344,22 @@ export function useDeleteTimeOff() {
       if (!response.ok) throw toApiError(error);
     },
     onSettled: () => refreshAfterChange(client),
+  });
+}
+
+// ---------------------------------------------------------------------------- dashboard (P2)
+/** Số liệu dashboard của khoảng ngày (FR-RPT-01); giữ số cũ trong lúc tải khoảng mới. */
+export function useAdminStats(range: { from: string; to: string }) {
+  return useQuery({
+    queryKey: ["admin", "stats", range],
+    placeholderData: keepPreviousData,
+    refetchInterval: REFRESH_MS,
+    queryFn: async (): Promise<Stats> => {
+      const { data, error } = await api.GET("/api/v1/admin/stats", {
+        params: { query: { date_from: range.from, date_to: range.to } },
+      });
+      if (!data) throw toApiError(error);
+      return data;
+    },
   });
 }

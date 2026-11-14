@@ -104,11 +104,6 @@ export const ChevronDownIcon = (p: IconProps) => (
     <path d="M6 9l6 6 6-6" />
   </Icon>
 );
-export const ToolsIcon = (p: IconProps) => (
-  <Icon {...p}>
-    <path d="M14.5 6.5a4 4 0 0 0-5.3 5.3L4 17l3 3 5.2-5.2a4 4 0 0 0 5.3-5.3l-2.6 2.6-2.4-.6-.6-2.4z" />
-  </Icon>
-);
 export const SearchIcon = (p: IconProps) => (
   <Icon {...p}>
     <circle cx="11" cy="11" r="6.5" />
@@ -184,5 +179,26 @@ export const MoreIcon = (p: IconProps) => (
     <circle cx="5.5" cy="12" r="1" />
     <circle cx="12" cy="12" r="1" />
     <circle cx="18.5" cy="12" r="1" />
+  </Icon>
+);
+/** Sao đánh giá: `filled` tô kín bằng màu chữ hiện tại, không thì chỉ viền. */
+export const StarIcon = ({ filled = true, ...p }: IconProps & { filled?: boolean }) => (
+  <Icon
+    {...p}
+    fill={filled ? "currentColor" : "none"}
+    strokeWidth={filled ? 0 : 1.6}
+    strokeLinejoin="round"
+  >
+    <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
+  </Icon>
+);
+export const ArrowUpIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 19V5M6 11l6-6 6 6" />
+  </Icon>
+);
+export const ArrowDownIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 5v14M6 13l6 6 6-6" />
   </Icon>
 );

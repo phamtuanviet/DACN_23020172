@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { formatPhone, formatPrice, initials, splitScope, unaccent } from "./format";
+import {
+  formatCount,
+  formatPercent,
+  formatPhone,
+  formatPrice,
+  formatRating,
+  initials,
+  splitScope,
+  unaccent,
+} from "./format";
 
 describe("format", () => {
   it("số điện thoại tách nhóm 4-3-3", () => {
@@ -12,6 +21,14 @@ describe("format", () => {
   it("giá theo kiểu Việt Nam", () => {
     expect(formatPrice(250_000)).toBe("250.000 ₫");
     expect(formatPrice(0)).toBe("0 ₫");
+  });
+
+  it("điểm, tỷ lệ, số đếm dùng dấu phẩy thập phân và dấu chấm hàng nghìn", () => {
+    expect(formatRating(4.8)).toBe("4,8");
+    expect(formatRating(5)).toBe("5,0");
+    expect(formatPercent(0.0812)).toBe("8,1%");
+    expect(formatPercent(0)).toBe("0,0%");
+    expect(formatCount(1284)).toBe("1.284");
   });
 
   it("chữ viết tắt bỏ học hàm, lấy hai từ cuối", () => {

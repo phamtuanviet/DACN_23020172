@@ -1,6 +1,7 @@
 "use client";
 
-// Lịch của tôi (P-appts, P-appts-m; UC08): tab Sắp tới, Lịch sử, lọc theo trạng thái (FR-APT-04).
+// Lịch của tôi (P-appts, P-appts-m; UC08): tab Sắp tới, Lịch sử, lọc theo trạng thái (FR-APT-04);
+// lịch Đã khám có nút đánh giá ở phần chi tiết (UC20).
 // Tab, bộ lọc và lịch đang xem nằm trên URL (?tab=&status=&id=) nên Back và tải lại trang giữ
 // nguyên chỗ. Máy tính: danh sách bên trái, chi tiết bên phải; điện thoại: bấm thẻ để xem chi tiết.
 import Link from "next/link";
@@ -21,6 +22,7 @@ import { inputClass } from "@/shared/ui/field";
 import { CalendarPlusIcon, InfoIcon } from "@/shared/ui/icons";
 
 import { AppointmentDetail } from "./appointment-detail";
+import { ReviewDialog } from "./review-dialog";
 
 const T = TEXT.appointments;
 const ACTIVE_LIMIT = 3; // BR-09
@@ -29,7 +31,7 @@ const FILTERS: Record<AppointmentScope, AppointmentStatus[]> = {
   history: ["COMPLETED", "CANCELLED", "NO_SHOW"],
 };
 
-type DialogState = { kind: "reschedule" | "cancel"; appointment: Appointment } | null;
+type DialogState = { kind: "reschedule" | "cancel" | "review"; appointment: Appointment } | null;
 
 function parseId(value: string | null): number | undefined {
   return value && /^\d+$/.test(value) ? Number(value) : undefined;
@@ -187,6 +189,7 @@ export function MyAppointmentsPage() {
               backHref={href({ tab, status })}
               onReschedule={(appointment) => setDialog({ kind: "reschedule", appointment })}
               onCancel={(appointment) => setDialog({ kind: "cancel", appointment })}
+              onReview={(appointment) => setDialog({ kind: "review", appointment })}
             />
           </div>
         ) : null}
@@ -194,6 +197,9 @@ export function MyAppointmentsPage() {
 
       {dialog?.kind === "reschedule" ? (
         <RescheduleDialog appointment={dialog.appointment} onClose={() => setDialog(null)} />
+      ) : null}
+      {dialog?.kind === "review" ? (
+        <ReviewDialog appointment={dialog.appointment} onClose={() => setDialog(null)} />
       ) : null}
       {dialog?.kind === "cancel" ? (
         <CancelDialog

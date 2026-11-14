@@ -43,7 +43,8 @@ describe("errorMessage", () => {
     ["DOCTOR_SERVICE_MISMATCH", "không thực hiện dịch vụ"],
     ["PATIENT_OVERLAP", "trùng giờ"],
     ["MAX_ACTIVE_APPOINTMENTS", "3 lịch"],
-  ])("có thông báo tiếng Việt cho lỗi đặt lịch %s", (code, text) => {
+    ["ALREADY_REVIEWED", "một lần"],
+  ])("có thông báo tiếng Việt cho lỗi đặt lịch, đánh giá %s", (code, text) => {
     expect(errorMessage({ code, message: "x" })).toContain(text);
   });
 

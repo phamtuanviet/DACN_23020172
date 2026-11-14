@@ -1,5 +1,14 @@
-import { PagePlaceholder } from "@/shared/ui/page-placeholder";
+import type { Metadata } from "next";
+import { Suspense } from "react";
+
+import { AdminDashboardPage } from "@/features/admin";
+
+export const metadata: Metadata = { title: "Tổng quan" };
 
 export default function Page() {
-  return <PagePlaceholder sprint={6} title="Dashboard" description="Thống kê (UC19, P2)." />;
+  return (
+    <Suspense>
+      <AdminDashboardPage />
+    </Suspense>
+  );
 }

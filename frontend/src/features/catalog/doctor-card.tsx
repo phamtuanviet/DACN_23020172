@@ -6,6 +6,7 @@ import { EarliestHint } from "@/shared/availability/earliest-hint";
 import { cn } from "@/shared/lib/cn";
 import { TEXT } from "@/shared/texts";
 import { Avatar } from "@/shared/ui/avatar";
+import { RatingSummary } from "@/shared/ui/rating";
 
 /** Dịch vụ dùng để tính "Sớm nhất": dịch vụ đang chọn nếu bác sĩ có làm, không thì dịch vụ đầu. */
 export function earliestServiceOf(doctor: Doctor, preferred?: number): number | undefined {
@@ -49,6 +50,12 @@ export function DoctorCard({
         <span className="text-sm text-muted">
           {doctor.specialty.name} · {gender}
         </span>
+        <RatingSummary
+          average={doctor.rating_average}
+          count={doctor.rating_count}
+          compact
+          className="text-sm"
+        />
         {serviceId !== undefined ? (
           <span
             className={cn("text-sm", layout === "stack" && "mt-1.5 border-t border-divider pt-2.5")}

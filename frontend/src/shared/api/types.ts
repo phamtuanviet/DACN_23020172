@@ -25,6 +25,7 @@ export type Channel = Schemas["Channel"];
 export type Me = Schemas["MeResponse"];
 export type PatientBrief = Schemas["PatientBrief"];
 export type PastVisit = Schemas["PastVisit"];
+export type Review = Schemas["ReviewOut"];
 // Bác sĩ (D-day, D-week, D-detail)
 export type DoctorSchedule = Schemas["DoctorScheduleOut"];
 export type ScheduleAppointment = Schemas["ScheduleAppointment"];
@@ -41,3 +42,7 @@ export type DoctorAdmin = Schemas["DoctorAdminOut"];
 export type Shift = Schemas["ShiftOut"];
 export type TimeOff = Schemas["TimeOffOut"];
 export type AffectedAppointment = Schemas["AffectedOut"];
+// Dashboard (AD-dashboard, P2)
+export type Stats = Schemas["StatsOut"];
+export type DayStats = Schemas["DayStats"];
+export type DoctorStats = Schemas["DoctorStats"];
