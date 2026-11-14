@@ -9,7 +9,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Query, status
 
 from app.core.db import SessionDep
-from app.core.security import AdminActorDep, ClockDep
+from app.core.security import AdminActorDep, ClockDep, SettingsDep
 from app.core.validation import MAX_ID, SafeText
 from app.modules.catalog.schemas import (
     DoctorAdminOut,
@@ -29,8 +29,10 @@ from app.modules.catalog.schemas import (
 from app.modules.catalog.service import CatalogService
 
 
-def get_catalog_service(session: SessionDep, clock: ClockDep) -> CatalogService:
-    return CatalogService(session, clock)
+def get_catalog_service(
+    session: SessionDep, clock: ClockDep, settings: SettingsDep
+) -> CatalogService:
+    return CatalogService(session, clock, settings)
 
 
 CatalogServiceDep = Annotated[CatalogService, Depends(get_catalog_service)]
@@ -72,7 +74,8 @@ async def search_doctors(
 
 @public_router.get("/doctors/{doctor_id}")
 async def get_doctor(doctor_id: IdPath, service: CatalogServiceDep) -> DoctorDetail:
-    """Hồ sơ bác sĩ: dịch vụ thực hiện, lịch làm việc trong tuần (UC03)."""
+    """Hồ sơ bác sĩ: dịch vụ thực hiện, lịch làm việc trong tuần (UC03), điểm đánh giá trung bình
+    (FR-RPT-03)."""
     return await service.get_doctor(doctor_id)
 
 

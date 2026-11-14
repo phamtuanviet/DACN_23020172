@@ -78,12 +78,14 @@ APPOINTMENT_FORBIDDEN = [
     ("PATCH", "/api/v1/appointments/1/status", PATIENT),
     ("PATCH", "/api/v1/appointments/1/note", PATIENT),
     ("PATCH", "/api/v1/appointments/1/note", ADMIN),  # quản trị chỉ xem ghi chú (docs mục 4.6)
+    ("POST", "/api/v1/appointments/1/review", DOCTOR),  # chỉ bệnh nhân đánh giá (FR-RPT-02)
+    ("POST", "/api/v1/appointments/1/review", ADMIN),
 ]
 
 
 def test_appointment_routes_are_discovered() -> None:
-    # đặt, của tôi, chi tiết, đổi, hủy, đổi trạng thái, ghi chú sau khám
-    assert len(APPOINTMENT_ROUTES) == 7
+    # đặt, của tôi, chi tiết, đổi, hủy, đổi trạng thái, ghi chú sau khám, đánh giá
+    assert len(APPOINTMENT_ROUTES) == 8
 
 
 @pytest.mark.parametrize(("method", "path"), APPOINTMENT_ROUTES)

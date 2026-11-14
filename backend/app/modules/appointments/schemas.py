@@ -144,6 +144,15 @@ class PastVisit(BaseModel):
     doctor_note: str | None
 
 
+class ReviewOut(BaseModel):
+    """Đánh giá của bệnh nhân cho một lịch Đã khám (FR-RPT-02). Bảng `reviews` do module reports
+    ghi; module này chỉ đọc để hiện trong chi tiết lịch."""
+
+    rating: int = Field(description="1–5 sao")
+    comment: str | None
+    created_at: datetime
+
+
 class AppointmentDetail(AppointmentOut):
     reason: str | None
     cancel_reason: str | None
@@ -156,6 +165,10 @@ class AppointmentDetail(AppointmentOut):
         description="Chỉ khi bác sĩ của lịch xem: các lần khám trước của bệnh nhân với chính bác "
         "sĩ đó, mới nhất trước; người khác nhận danh sách rỗng"
     )
+    review: ReviewOut | None = Field(
+        description="Đánh giá đã gửi; chỉ chủ lịch và quản trị thấy, bác sĩ nhận rỗng"
+    )
+    can_review: bool = Field(description="Chủ lịch đánh giá được: lịch Đã khám và chưa đánh giá")
 
 
 # ---------------------------------------------------------------------------- lịch khám của bác sĩ

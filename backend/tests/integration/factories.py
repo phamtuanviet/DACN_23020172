@@ -144,6 +144,8 @@ async def add_appointment(
     code: str | None = None,
     service_id: int | None = None,
     needs_attention: bool = False,
+    channel: Channel = Channel.WEB,
+    created_at: datetime | None = None,
 ) -> int:
     """Ghi thẳng một lịch hẹn (bỏ qua service) để dựng tình huống cho test."""
     start_at = local_datetime(day, start)
@@ -156,9 +158,11 @@ async def add_appointment(
             start_at=start_at,
             end_at=start_at + timedelta(minutes=minutes),
             status=status,
-            channel=Channel.WEB,
+            channel=channel,
             needs_attention=needs_attention,
         )
+        if created_at is not None:
+            appointment.created_at = created_at
         db.add(appointment)
         await db.flush()
         return appointment.id

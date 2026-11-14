@@ -1,4 +1,5 @@
 """Truy vấn của module appointments: appointments, appointment_history; khóa dòng (docs mục 5.4).
+Đọc thêm `reviews` (module reports ghi) để hiện đánh giá trong chi tiết lịch.
 
 Không ra quyết định nghiệp vụ (docs mục 4.2). Thứ tự khóa luôn là bệnh nhân → bác sĩ → lịch hẹn.
 Câu khóa dòng dùng `populate_existing`: dòng đã nạp trước đó trong session được đọc lại sau khi
@@ -15,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.db.enums import AppointmentStatus, Channel, HistoryAction, UserRole
-from app.db.models.appointments import Appointment, AppointmentHistory
+from app.db.models.appointments import Appointment, AppointmentHistory, Review
 from app.db.models.catalog import Service
 from app.db.models.users import Doctor, PatientProfile, User
 from app.modules.appointments.schemas import Scope
@@ -252,6 +253,12 @@ async def detail(session: AsyncSession, appointment_id: int) -> DetailRow | None
     if row is None:
         return None
     return DetailRow(row[0], row[1], row[2], row[3], row[4])
+
+
+async def review_of(session: AsyncSession, appointment_id: int) -> Review | None:
+    """Chỉ đọc: bảng `reviews` do module reports ghi."""
+    stmt = select(Review).where(Review.appointment_id == appointment_id)
+    return (await session.execute(stmt)).scalar_one_or_none()
 
 
 async def labels(session: AsyncSession, appointment: Appointment) -> tuple[str, str]:

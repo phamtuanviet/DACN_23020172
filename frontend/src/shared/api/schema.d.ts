@@ -234,7 +234,8 @@ export interface paths {
         };
         /**
          * Get Doctor
-         * @description Hồ sơ bác sĩ: dịch vụ thực hiện, lịch làm việc trong tuần (UC03).
+         * @description Hồ sơ bác sĩ: dịch vụ thực hiện, lịch làm việc trong tuần (UC03), điểm đánh giá trung bình
+         *     (FR-RPT-03).
          */
         get: operations["get_doctor_api_v1_doctors__doctor_id__get"];
         put?: never;
@@ -851,6 +852,49 @@ export interface paths {
         patch: operations["update_support_request_api_v1_admin_support_requests__request_id__patch"];
         trace?: never;
     };
+    "/api/v1/appointments/{appointment_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Review
+         * @description Đánh giá bác sĩ 1–5 sao kèm nhận xét tùy chọn, cho lịch Đã khám của chính mình, mỗi lịch
+         *     một lần (UC20, FR-RPT-02). Lỗi: FORBIDDEN (403), INVALID_TRANSITION khi lịch chưa Đã khám,
+         *     ALREADY_REVIEWED (409); RATE_LIMITED (429) như các thao tác ghi lịch hẹn.
+         */
+        post: operations["create_review_api_v1_appointments__appointment_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin Stats
+         * @description Số liệu dashboard: số lịch theo ngày, tỷ lệ hủy, tỷ lệ vắng mặt, số lịch theo bác sĩ, tỷ lệ
+         *     đặt qua web và Agent (UC19, FR-RPT-01).
+         */
+        get: operations["admin_stats_api_v1_admin_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1000,6 +1044,13 @@ export interface components {
              * @description Chỉ khi bác sĩ của lịch xem: các lần khám trước của bệnh nhân với chính bác sĩ đó, mới nhất trước; người khác nhận danh sách rỗng
              */
             previous_visits: components["schemas"]["PastVisit"][];
+            /** @description Đánh giá đã gửi; chỉ chủ lịch và quản trị thấy, bác sĩ nhận rỗng */
+            review: components["schemas"]["ReviewOut"] | null;
+            /**
+             * Can Review
+             * @description Chủ lịch đánh giá được: lịch Đã khám và chưa đánh giá
+             */
+            can_review: boolean;
         };
         /** AppointmentOut */
         AppointmentOut: {
@@ -1119,6 +1170,16 @@ export interface components {
          */
         Channel: "WEB" | "AGENT" | "ADMIN" | "SYSTEM";
         /**
+         * ChannelSplit
+         * @description Lịch được đặt trong khoảng (theo thời điểm đặt, kể cả lịch sau đó bị hủy), theo kênh.
+         */
+        ChannelSplit: {
+            /** Web */
+            web: number;
+            /** Agent */
+            agent: number;
+        };
+        /**
          * ChatItem
          * @description Một dòng trong khung chat khi tải lại hội thoại (docs mục 9.5).
          */
@@ -1195,6 +1256,26 @@ export interface components {
             status: components["schemas"]["DayStatus"];
             /** Slots */
             slots: components["schemas"]["SlotOut"][];
+        };
+        /** DayStats */
+        DayStats: {
+            /** Total */
+            total: number;
+            /** Booked */
+            booked: number;
+            /** Arrived */
+            arrived: number;
+            /** Completed */
+            completed: number;
+            /** Cancelled */
+            cancelled: number;
+            /** No Show */
+            no_show: number;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
         };
         /**
          * DayStatus
@@ -1279,6 +1360,16 @@ export interface components {
             specialty: components["schemas"]["SpecialtyRef"];
             /** Services */
             services: components["schemas"]["ServiceBrief"][];
+            /**
+             * Rating Average
+             * @description Điểm đánh giá trung bình 1–5, làm tròn một chữ số; rỗng khi chưa đủ RATING_MIN_COUNT lượt (mặc định 3), để không suy ra được điểm của từng bệnh nhân
+             */
+            rating_average: number | null;
+            /**
+             * Rating Count
+             * @description Số lượt đánh giá (FR-RPT-03)
+             */
+            rating_count: number;
             /** Bio */
             bio: string | null;
             /**
@@ -1302,6 +1393,16 @@ export interface components {
             specialty: components["schemas"]["SpecialtyRef"];
             /** Services */
             services: components["schemas"]["ServiceBrief"][];
+            /**
+             * Rating Average
+             * @description Điểm đánh giá trung bình 1–5, làm tròn một chữ số; rỗng khi chưa đủ RATING_MIN_COUNT lượt (mặc định 3), để không suy ra được điểm của từng bệnh nhân
+             */
+            rating_average: number | null;
+            /**
+             * Rating Count
+             * @description Số lượt đánh giá (FR-RPT-03)
+             */
+            rating_count: number;
         };
         /** DoctorRef */
         DoctorRef: {
@@ -1343,6 +1444,25 @@ export interface components {
              * @description Tối đa 3 ngày nghỉ sắp tới
              */
             upcoming_time_offs: components["schemas"]["TimeOffBlock"][];
+        };
+        /** DoctorStats */
+        DoctorStats: {
+            /** Total */
+            total: number;
+            /** Booked */
+            booked: number;
+            /** Arrived */
+            arrived: number;
+            /** Completed */
+            completed: number;
+            /** Cancelled */
+            cancelled: number;
+            /** No Show */
+            no_show: number;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
         };
         /**
          * DoctorUpdate
@@ -1588,6 +1708,19 @@ export interface components {
          * @enum {string}
          */
         ProposalType: "BOOK" | "RESCHEDULE" | "CANCEL";
+        /** Rates */
+        Rates: {
+            /**
+             * Cancel Rate
+             * @description Đã hủy / mọi lịch có giờ khám trong khoảng (kể cả đã hủy); rỗng khi không có lịch nào
+             */
+            cancel_rate: number | null;
+            /**
+             * No Show Rate
+             * @description Vắng mặt / (Đã đến + Đã khám + Vắng mặt), tức trên các lịch đã biết kết quả; rỗng khi chưa có lịch nào như vậy
+             */
+            no_show_rate: number | null;
+        };
         /** RegisterRequest */
         RegisterRequest: {
             /** Full Name */
@@ -1629,6 +1762,38 @@ export interface components {
              * @description Bác sĩ hiện tại hoặc một bác sĩ khác cùng dịch vụ
              */
             doctor_id: number;
+        };
+        /** ReviewCreate */
+        ReviewCreate: {
+            /**
+             * Rating
+             * @description Số sao, từ 1 đến 5
+             */
+            rating: number;
+            /**
+             * Comment
+             * @description Nhận xét, tùy chọn, tối đa 500 ký tự
+             */
+            comment?: string | null;
+        };
+        /**
+         * ReviewOut
+         * @description Đánh giá của bệnh nhân cho một lịch Đã khám (FR-RPT-02). Bảng `reviews` do module reports
+         *     ghi; module này chỉ đọc để hiện trong chi tiết lịch.
+         */
+        ReviewOut: {
+            /**
+             * Rating
+             * @description 1–5 sao
+             */
+            rating: number;
+            /** Comment */
+            comment: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * ScheduleAppointment
@@ -1984,6 +2149,37 @@ export interface components {
             is_active?: boolean | null;
         };
         /**
+         * StatsOut
+         * @description Số liệu dashboard (FR-RPT-01, AC-18). Ngày theo giờ Việt Nam; lịch tính theo ngày khám.
+         */
+        StatsOut: {
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            totals: components["schemas"]["StatusCounts"];
+            rates: components["schemas"]["Rates"];
+            /** @description Cùng số ngày, liền trước khoảng đang xem */
+            previous_rates: components["schemas"]["Rates"];
+            /**
+             * Days
+             * @description Đủ mọi ngày trong khoảng, ngày không có lịch là 0
+             */
+            days: components["schemas"]["DayStats"][];
+            /**
+             * Doctors
+             * @description Bác sĩ đang hoạt động và bác sĩ có lịch trong khoảng; nhiều lịch nhất trước
+             */
+            doctors: components["schemas"]["DoctorStats"][];
+            channels: components["schemas"]["ChannelSplit"];
+        };
+        /**
          * StatusChangeRequest
          * @description Hủy lịch đi qua `/cancel` để có lý do và email; endpoint này chỉ dành cho buổi khám.
          */
@@ -1993,6 +2189,24 @@ export interface components {
              * @enum {string}
              */
             status: "ARRIVED" | "COMPLETED" | "NO_SHOW";
+        };
+        /**
+         * StatusCounts
+         * @description Số lịch hẹn theo trạng thái hiện tại. `total` là mọi lịch trừ Đã hủy.
+         */
+        StatusCounts: {
+            /** Total */
+            total: number;
+            /** Booked */
+            booked: number;
+            /** Arrived */
+            arrived: number;
+            /** Completed */
+            completed: number;
+            /** Cancelled */
+            cancelled: number;
+            /** No Show */
+            no_show: number;
         };
         /**
          * SupportPatient
@@ -3740,6 +3954,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SupportRequestAdminOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_review_api_v1_appointments__appointment_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                appointment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_stats_api_v1_admin_stats_get: {
+        parameters: {
+            query?: {
+                /** @description Ngày đầu, giờ Việt Nam; mặc định 13 ngày trước */
+                date_from?: string | null;
+                /** @description Ngày cuối, tối đa 31 ngày; mặc định hôm nay */
+                date_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatsOut"];
                 };
             };
             /** @description Validation Error */

@@ -79,6 +79,11 @@ def test_log_filter_masks_personal_fields() -> None:
     masked = redact_sensitive(None, "info", event)
     assert masked == {"event": "x", "email": REDACTED, "reason": REDACTED, "tool": "search"}
 
-    # Ghi chú của bác sĩ và địa chỉ người nhận email (Sprint 5) cũng bị che
-    event = {"note": "Viêm da", "to": "lan@example.com", "recipient_email": "lan@example.com"}
+    # Ghi chú của bác sĩ và địa chỉ người nhận email (Sprint 5), nhận xét đánh giá (Sprint 6)
+    event = {
+        "note": "Viêm da",
+        "to": "lan@example.com",
+        "recipient_email": "lan@example.com",
+        "comment": "Bác sĩ khám kỹ",
+    }
     assert set(redact_sensitive(None, "info", event).values()) == {REDACTED}

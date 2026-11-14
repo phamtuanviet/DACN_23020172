@@ -13,7 +13,7 @@ from sqlalchemy import ColumnElement, and_, delete, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import AppointmentStatus
-from app.db.models.appointments import Appointment
+from app.db.models.appointments import Appointment, Review
 from app.db.models.catalog import DoctorService, Service, Specialty
 from app.db.models.schedule import Shift
 from app.db.models.users import Doctor, User
@@ -259,6 +259,25 @@ async def services_by_doctor(
     for doctor_id, service in (await session.execute(stmt)).all():
         result[doctor_id].append(service)
     return result
+
+
+async def ratings_by_doctor(
+    session: AsyncSession, doctor_ids: Sequence[int]
+) -> dict[int, tuple[float, int]]:
+    """{doctor_id: (điểm trung bình làm tròn một chữ số, số lượt)} (FR-RPT-03). Chỉ đọc: bảng
+    `reviews` do module reports ghi."""
+    if not doctor_ids:
+        return {}
+    stmt = (
+        select(Appointment.doctor_id, func.round(func.avg(Review.rating), 1), func.count())
+        .join(Appointment, Appointment.id == Review.appointment_id)
+        .where(Appointment.doctor_id.in_(doctor_ids))
+        .group_by(Appointment.doctor_id)
+    )
+    return {
+        doctor_id: (float(average), count)
+        for doctor_id, average, count in (await session.execute(stmt)).all()
+    }
 
 
 async def list_doctor_accounts(

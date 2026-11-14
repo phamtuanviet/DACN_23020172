@@ -9,7 +9,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Query, Request, status
 
 from app.core.db import SessionDep
-from app.core.ratelimit import APPOINTMENT_WRITE_LIMIT, limiter, user_or_ip
+from app.core.ratelimit import appointment_write_limit
 from app.core.security import (
     ActorDep,
     AdminActorDep,
@@ -58,7 +58,7 @@ admin_router = APIRouter(prefix="/admin/appointments", tags=["admin-appointments
 
 
 @appointments_router.post("", status_code=status.HTTP_201_CREATED)
-@limiter.limit(APPOINTMENT_WRITE_LIMIT, key_func=user_or_ip)
+@appointment_write_limit
 async def book_appointment(
     request: Request, body: BookRequest, actor: PatientActorDep, service: AppointmentServiceDep
 ) -> AppointmentOut:
@@ -98,7 +98,7 @@ async def get_appointment(
 
 
 @appointments_router.patch("/{appointment_id}/reschedule")
-@limiter.limit(APPOINTMENT_WRITE_LIMIT, key_func=user_or_ip)
+@appointment_write_limit
 async def reschedule_appointment(
     request: Request,
     appointment_id: IdPath,
@@ -116,7 +116,7 @@ async def reschedule_appointment(
 
 
 @appointments_router.post("/{appointment_id}/cancel")
-@limiter.limit(APPOINTMENT_WRITE_LIMIT, key_func=user_or_ip)
+@appointment_write_limit
 async def cancel_appointment(
     request: Request,
     appointment_id: IdPath,

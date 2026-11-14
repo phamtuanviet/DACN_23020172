@@ -550,7 +550,7 @@
           "catalog"
         ],
         "summary": "Get Doctor",
-        "description": "Hồ sơ bác sĩ: dịch vụ thực hiện, lịch làm việc trong tuần (UC03).",
+        "description": "Hồ sơ bác sĩ: dịch vụ thực hiện, lịch làm việc trong tuần (UC03), điểm đánh giá trung bình\n(FR-RPT-03).",
         "operationId": "get_doctor_api_v1_doctors__doctor_id__get",
         "parameters": [
           {
@@ -2838,6 +2838,143 @@
           }
         }
       }
+    },
+    "/api/v1/appointments/{appointment_id}/review": {
+      "post": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Create Review",
+        "description": "Đánh giá bác sĩ 1–5 sao kèm nhận xét tùy chọn, cho lịch Đã khám của chính mình, mỗi lịch\nmột lần (UC20, FR-RPT-02). Lỗi: FORBIDDEN (403), INVALID_TRANSITION khi lịch chưa Đã khám,\nALREADY_REVIEWED (409); RATE_LIMITED (429) như các thao tác ghi lịch hẹn.",
+        "operationId": "create_review_api_v1_appointments__appointment_id__review_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Appointment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/stats": {
+      "get": {
+        "tags": [
+          "admin-reports"
+        ],
+        "summary": "Admin Stats",
+        "description": "Số liệu dashboard: số lịch theo ngày, tỷ lệ hủy, tỷ lệ vắng mặt, số lịch theo bác sĩ, tỷ lệ\nđặt qua web và Agent (UC19, FR-RPT-01).",
+        "operationId": "admin_stats_api_v1_admin_stats_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Ngày đầu, giờ Việt Nam; mặc định 13 ngày trước",
+              "title": "Date From"
+            },
+            "description": "Ngày đầu, giờ Việt Nam; mặc định 13 ngày trước"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Ngày cuối, tối đa 31 ngày; mặc định hôm nay",
+              "title": "Date To"
+            },
+            "description": "Ngày cuối, tối đa 31 ngày; mặc định hôm nay"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3142,6 +3279,22 @@
             "type": "array",
             "title": "Previous Visits",
             "description": "Chỉ khi bác sĩ của lịch xem: các lần khám trước của bệnh nhân với chính bác sĩ đó, mới nhất trước; người khác nhận danh sách rỗng"
+          },
+          "review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Đánh giá đã gửi; chỉ chủ lịch và quản trị thấy, bác sĩ nhận rỗng"
+          },
+          "can_review": {
+            "type": "boolean",
+            "title": "Can Review",
+            "description": "Chủ lịch đánh giá được: lịch Đã khám và chưa đánh giá"
           }
         },
         "type": "object",
@@ -3163,7 +3316,9 @@
           "patient",
           "created_at",
           "history",
-          "previous_visits"
+          "previous_visits",
+          "review",
+          "can_review"
         ],
         "title": "AppointmentDetail"
       },
@@ -3429,6 +3584,25 @@
         ],
         "title": "Channel"
       },
+      "ChannelSplit": {
+        "properties": {
+          "web": {
+            "type": "integer",
+            "title": "Web"
+          },
+          "agent": {
+            "type": "integer",
+            "title": "Agent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "web",
+          "agent"
+        ],
+        "title": "ChannelSplit",
+        "description": "Lịch được đặt trong khoảng (theo thời điểm đặt, kể cả lịch sau đó bị hủy), theo kênh."
+      },
       "ChatItem": {
         "properties": {
           "id": {
@@ -3634,6 +3808,50 @@
         ],
         "title": "DayOut"
       },
+      "DayStats": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "booked": {
+            "type": "integer",
+            "title": "Booked"
+          },
+          "arrived": {
+            "type": "integer",
+            "title": "Arrived"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "cancelled": {
+            "type": "integer",
+            "title": "Cancelled"
+          },
+          "no_show": {
+            "type": "integer",
+            "title": "No Show"
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "booked",
+          "arrived",
+          "completed",
+          "cancelled",
+          "no_show",
+          "day"
+        ],
+        "title": "DayStats"
+      },
       "DayStatus": {
         "type": "string",
         "enum": [
@@ -3814,6 +4032,23 @@
             "type": "array",
             "title": "Services"
           },
+          "rating_average": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating Average",
+            "description": "Điểm đánh giá trung bình 1–5, làm tròn một chữ số; rỗng khi chưa đủ RATING_MIN_COUNT lượt (mặc định 3), để không suy ra được điểm của từng bệnh nhân"
+          },
+          "rating_count": {
+            "type": "integer",
+            "title": "Rating Count",
+            "description": "Số lượt đánh giá (FR-RPT-03)"
+          },
           "bio": {
             "anyOf": [
               {
@@ -3842,6 +4077,8 @@
           "gender",
           "specialty",
           "services",
+          "rating_average",
+          "rating_count",
           "bio",
           "working_hours"
         ],
@@ -3874,6 +4111,23 @@
             },
             "type": "array",
             "title": "Services"
+          },
+          "rating_average": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating Average",
+            "description": "Điểm đánh giá trung bình 1–5, làm tròn một chữ số; rỗng khi chưa đủ RATING_MIN_COUNT lượt (mặc định 3), để không suy ra được điểm của từng bệnh nhân"
+          },
+          "rating_count": {
+            "type": "integer",
+            "title": "Rating Count",
+            "description": "Số lượt đánh giá (FR-RPT-03)"
           }
         },
         "type": "object",
@@ -3883,7 +4137,9 @@
           "title",
           "gender",
           "specialty",
-          "services"
+          "services",
+          "rating_average",
+          "rating_count"
         ],
         "title": "DoctorOut"
       },
@@ -3960,6 +4216,54 @@
         ],
         "title": "DoctorScheduleOut",
         "description": "Lịch khám theo ngày hoặc tuần (FR-DOC-01, UC12): lịch ở mọi trạng thái, giờ làm theo ca,\nngày nghỉ."
+      },
+      "DoctorStats": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "booked": {
+            "type": "integer",
+            "title": "Booked"
+          },
+          "arrived": {
+            "type": "integer",
+            "title": "Arrived"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "cancelled": {
+            "type": "integer",
+            "title": "Cancelled"
+          },
+          "no_show": {
+            "type": "integer",
+            "title": "No Show"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "booked",
+          "arrived",
+          "completed",
+          "cancelled",
+          "no_show",
+          "id",
+          "name"
+        ],
+        "title": "DoctorStats"
       },
       "DoctorUpdate": {
         "properties": {
@@ -4632,6 +4936,40 @@
         ],
         "title": "ProposalType"
       },
+      "Rates": {
+        "properties": {
+          "cancel_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Rate",
+            "description": "Đã hủy / mọi lịch có giờ khám trong khoảng (kể cả đã hủy); rỗng khi không có lịch nào"
+          },
+          "no_show_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Show Rate",
+            "description": "Vắng mặt / (Đã đến + Đã khám + Vắng mặt), tức trên các lịch đã biết kết quả; rỗng khi chưa có lịch nào như vậy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cancel_rate",
+          "no_show_rate"
+        ],
+        "title": "Rates"
+      },
       "RegisterRequest": {
         "properties": {
           "full_name": {
@@ -4703,6 +5041,68 @@
         ],
         "title": "RescheduleRequest",
         "description": "Đổi lịch giữ nguyên dịch vụ và mã lịch (UC06).\n\n`doctor_id` bắt buộc, kể cả khi giữ bác sĩ cũ: khung giờ người dùng chọn thuộc lưới của đúng\nbác sĩ đó, và service khóa bác sĩ này trước khi khóa lịch hẹn (docs mục 5.4)."
+      },
+      "ReviewCreate": {
+        "properties": {
+          "rating": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Rating",
+            "description": "Số sao, từ 1 đến 5"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment",
+            "description": "Nhận xét, tùy chọn, tối đa 500 ký tự"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rating"
+        ],
+        "title": "ReviewCreate"
+      },
+      "ReviewOut": {
+        "properties": {
+          "rating": {
+            "type": "integer",
+            "title": "Rating",
+            "description": "1–5 sao"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rating",
+          "comment",
+          "created_at"
+        ],
+        "title": "ReviewOut",
+        "description": "Đánh giá của bệnh nhân cho một lịch Đã khám (FR-RPT-02). Bảng `reviews` do module reports\nghi; module này chỉ đọc để hiện trong chi tiết lịch."
       },
       "ScheduleAppointment": {
         "properties": {
@@ -5567,6 +5967,62 @@
         "title": "SpecialtyUpdate",
         "description": "Chỉ trường được gửi mới đổi; ẩn hoặc hiện lại bằng `is_active`."
       },
+      "StatsOut": {
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "format": "date",
+            "title": "Date From"
+          },
+          "date_to": {
+            "type": "string",
+            "format": "date",
+            "title": "Date To"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/StatusCounts"
+          },
+          "rates": {
+            "$ref": "#/components/schemas/Rates"
+          },
+          "previous_rates": {
+            "$ref": "#/components/schemas/Rates",
+            "description": "Cùng số ngày, liền trước khoảng đang xem"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/DayStats"
+            },
+            "type": "array",
+            "title": "Days",
+            "description": "Đủ mọi ngày trong khoảng, ngày không có lịch là 0"
+          },
+          "doctors": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorStats"
+            },
+            "type": "array",
+            "title": "Doctors",
+            "description": "Bác sĩ đang hoạt động và bác sĩ có lịch trong khoảng; nhiều lịch nhất trước"
+          },
+          "channels": {
+            "$ref": "#/components/schemas/ChannelSplit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date_from",
+          "date_to",
+          "totals",
+          "rates",
+          "previous_rates",
+          "days",
+          "doctors",
+          "channels"
+        ],
+        "title": "StatsOut",
+        "description": "Số liệu dashboard (FR-RPT-01, AC-18). Ngày theo giờ Việt Nam; lịch tính theo ngày khám."
+      },
       "StatusChangeRequest": {
         "properties": {
           "status": {
@@ -5585,6 +6041,45 @@
         ],
         "title": "StatusChangeRequest",
         "description": "Hủy lịch đi qua `/cancel` để có lý do và email; endpoint này chỉ dành cho buổi khám."
+      },
+      "StatusCounts": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "booked": {
+            "type": "integer",
+            "title": "Booked"
+          },
+          "arrived": {
+            "type": "integer",
+            "title": "Arrived"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "cancelled": {
+            "type": "integer",
+            "title": "Cancelled"
+          },
+          "no_show": {
+            "type": "integer",
+            "title": "No Show"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "booked",
+          "arrived",
+          "completed",
+          "cancelled",
+          "no_show"
+        ],
+        "title": "StatusCounts",
+        "description": "Số lịch hẹn theo trạng thái hiện tại. `total` là mọi lịch trừ Đã hủy."
       },
       "SupportPatient": {
         "properties": {

@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
 from app.core.db import SessionDep
-from app.core.ratelimit import APPOINTMENT_WRITE_LIMIT, limiter, user_or_ip
+from app.core.ratelimit import appointment_write_limit
 from app.core.security import ClockDep, PatientActorDep, SettingsDep
 from app.modules.agent.llm import ChatModel, ChatModelDep
 from app.modules.agent.proposals import ProposalService
@@ -86,7 +86,7 @@ async def conversation_messages(
 
 
 @router.post("/proposals/{proposal_id}/confirm")
-@limiter.limit(APPOINTMENT_WRITE_LIMIT, key_func=user_or_ip)
+@appointment_write_limit
 async def confirm_proposal(
     request: Request,
     proposal_id: uuid.UUID,

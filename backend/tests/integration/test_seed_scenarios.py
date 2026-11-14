@@ -7,7 +7,7 @@
 """
 
 import time as clock_time
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -15,8 +15,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
+from app.core.timeutil import local_datetime
 from app.db.enums import AppointmentStatus, HistoryAction
-from app.db.models.appointments import Appointment, AppointmentHistory
+from app.db.models.appointments import Appointment, AppointmentHistory, Review
 from app.db.seed import DEMO_PASSWORD, seed_database
 from tests.conftest import TEST_NOW
 from tests.integration.conftest import MutableClock
@@ -160,3 +161,58 @@ async def test_seeded_appointments_have_a_realistic_lifecycle(
         await app_client.get("/api/v1/appointments/me?scope=history", headers=headers)
     ).json()
     assert upcoming["total"] == 2 and history["total"] >= 2
+
+
+async def test_seeded_reviews_feed_doctor_ratings_and_the_dashboard(
+    seeded: None, app_client: AsyncClient, db: AsyncSession
+) -> None:
+    """Sprint 6: đánh giá mẫu chỉ có ở lịch Đã khám, gửi sau buổi khám; hồ sơ bác sĩ có điểm;
+    tài khoản demo còn lịch chờ đánh giá; dashboard 14 ngày khớp số lịch trong database."""
+    reviews = (
+        await db.execute(
+            select(Appointment.status, Review.created_at, Appointment.end_at).join(
+                Appointment, Appointment.id == Review.appointment_id
+            )
+        )
+    ).all()
+    assert reviews
+    assert {status for status, _, _ in reviews} == {AppointmentStatus.COMPLETED}
+    assert all(end_at < created_at <= TEST_NOW for _, created_at, end_at in reviews)
+    in_range = await db.execute(
+        select(func.count()).where(
+            Appointment.start_at >= local_datetime(TODAY - timedelta(days=13), time(0)),
+            Appointment.start_at < local_datetime(TODAY + timedelta(days=1), time(0)),
+            Appointment.status != AppointmentStatus.CANCELLED,
+        )
+    )
+    expected_total = in_range.scalar_one()
+    await db.commit()
+
+    doctors = (await app_client.get("/api/v1/doctors")).json()
+    rated = [d for d in doctors if d["rating_average"] is not None]  # đủ 3 lượt mới hiện điểm
+    assert rated and all(1 <= d["rating_average"] <= 5 and d["rating_count"] >= 3 for d in rated)
+
+    login = await app_client.post(
+        "/api/v1/auth/login", json={"email": "lan@demo.local", "password": DEMO_PASSWORD}
+    )
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    history = await app_client.get(
+        "/api/v1/appointments/me",
+        params={"scope": "history", "status": "COMPLETED"},
+        headers=headers,
+    )
+    completed = history.json()["items"]
+    assert completed, "tài khoản demo cần lịch Đã khám để demo đánh giá"
+    detail = await app_client.get(f"/api/v1/appointments/{completed[0]['id']}", headers=headers)
+    assert detail.json()["can_review"] is True
+
+    admin = await app_client.post(
+        "/api/v1/auth/login", json={"email": "admin@demo.local", "password": DEMO_PASSWORD}
+    )
+    stats = await app_client.get(
+        "/api/v1/admin/stats",
+        headers={"Authorization": f"Bearer {admin.json()['access_token']}"},
+    )
+    assert stats.status_code == 200
+    assert stats.json()["totals"]["total"] == expected_total
+    assert stats.json()["channels"]["agent"] > 0

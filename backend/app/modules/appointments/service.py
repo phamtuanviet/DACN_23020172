@@ -21,7 +21,7 @@ from app.core.db import transaction
 from app.core.errors import AppError, field_error, forbidden, not_found, violated_constraint
 from app.core.timeutil import local_datetime, to_local
 from app.db.enums import AppointmentStatus, Channel, HistoryAction, NotificationType, UserRole
-from app.db.models.appointments import Appointment, AppointmentHistory
+from app.db.models.appointments import Appointment, AppointmentHistory, Review
 from app.modules.appointments import policy
 from app.modules.appointments import repository as repo
 from app.modules.appointments.codes import new_appointment_code
@@ -43,6 +43,7 @@ from app.modules.appointments.schemas import (
     PatientBrief,
     PatientContact,
     RescheduleRequest,
+    ReviewOut,
     ScheduleAppointment,
     Scope,
     ServiceRef,
@@ -191,6 +192,25 @@ async def flag_for_attention(
         )
         flagged.append(appointment.id)
     return flagged
+
+
+async def reviewable_appointment(
+    session: AsyncSession, actor: Actor, appointment_id: int
+) -> Appointment:
+    """Lịch hẹn `actor` được đánh giá; module reports dùng (FR-RPT-02). Chạy trong transaction
+    của người gọi. Lỗi: NOT_FOUND, FORBIDDEN khi không phải chủ lịch, INVALID_TRANSITION khi lịch
+    chưa Đã khám. Đã khám là trạng thái cuối nên không cần khóa dòng."""
+    appointment = await repo.get_appointment(session, appointment_id)
+    if appointment is None:
+        raise appointment_not_found()
+    policy.ensure_can_review(appointment, actor)
+    return appointment
+
+
+def review_out(review: Review) -> ReviewOut:
+    return ReviewOut(
+        rating=review.rating, comment=review.comment, created_at=to_local(review.created_at)
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -370,6 +390,11 @@ class AppointmentService:
                     before=row.appointment.start_at,
                     limit=PREVIOUS_VISITS,
                 )
+            review: Review | None = None
+            # bác sĩ chỉ thấy điểm trung bình trên hồ sơ, không đọc đánh giá của từng bệnh nhân
+            completed = row.appointment.status is AppointmentStatus.COMPLETED
+            if completed and actor.role is not UserRole.DOCTOR:
+                review = await repo.review_of(self._session, appointment_id)
         appointment = row.appointment
         base = self._out(appointment, row.service_name, row.doctor_name, actor, now)
         return AppointmentDetail(
@@ -407,6 +432,8 @@ class AppointmentService:
                 )
                 for visit, service_name in visits
             ],
+            review=review_out(review) if review else None,
+            can_review=policy.can_review(appointment, actor, reviewed=review is not None),
         )
 
     # ------------------------------------------------------------ bác sĩ (UC12, UC18)

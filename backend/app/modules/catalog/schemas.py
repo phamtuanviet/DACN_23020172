@@ -120,6 +120,11 @@ class DoctorOut(BaseModel):
     gender: Gender
     specialty: SpecialtyRef
     services: list[ServiceBrief]
+    rating_average: float | None = Field(
+        description="Điểm đánh giá trung bình 1–5, làm tròn một chữ số; rỗng khi chưa đủ "
+        "RATING_MIN_COUNT lượt (mặc định 3), để không suy ra được điểm của từng bệnh nhân"
+    )
+    rating_count: int = Field(description="Số lượt đánh giá (FR-RPT-03)")
 
 
 class WorkingHours(BaseModel):

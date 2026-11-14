@@ -3,7 +3,8 @@
 Tên bác sĩ, dịch vụ, giá khớp với thiết kế giao diện để demo nhất quán. Mọi mốc thời gian tính
 tương đối so với ngày chạy seed; dữ liệu ngẫu nhiên dùng seed cố định nên chạy lại ra kết quả như
 cũ. Lịch hẹn mẫu đặt, đổi, hủy, cập nhật trạng thái qua chính AppointmentService nên tuân theo
-mọi quy tắc nghiệp vụ và có lịch sử thay đổi như dữ liệu thật.
+mọi quy tắc nghiệp vụ và có lịch sử thay đổi như dữ liệu thật; đánh giá mẫu cũng gửi qua
+ReportService.
 """
 
 import contextlib
@@ -24,7 +25,7 @@ from app.core.errors import AppError
 from app.core.security import hash_password_async
 from app.core.timeutil import local_datetime, to_local
 from app.db.enums import AppointmentStatus, Channel, Gender, UserRole
-from app.db.models.appointments import Appointment, Notification
+from app.db.models.appointments import Appointment, Notification, Review
 from app.db.models.catalog import DoctorService, Service, Specialty
 from app.db.models.schedule import Shift, TimeOff
 from app.db.models.users import Doctor, PatientProfile, User
@@ -289,6 +290,18 @@ CANCEL_REASONS: list[str | None] = [
     "Đặt nhầm giờ",
     None,
 ]
+REVIEW_SHARE = 0.6  # khoảng 60% lịch Đã khám có đánh giá
+REVIEW_RATINGS = [5, 5, 5, 5, 5, 4, 4, 4, 3, 2]  # lệch về hài lòng như đánh giá thật
+REVIEW_COMMENTS: list[str | None] = [
+    "Bác sĩ giải thích rõ ràng, dễ hiểu.",
+    "Khám đúng giờ, không phải chờ lâu.",
+    "Bác sĩ nhẹ nhàng, tư vấn kỹ.",
+    "Phòng khám sạch sẽ, nhân viên thân thiện.",
+    "Phải chờ hơn 20 phút so với giờ hẹn.",
+    None,
+    None,
+    None,
+]
 REASONS: list[str | None] = [
     "Nổi mẩn đỏ ở tay",
     "Ho và sổ mũi 3 ngày",
@@ -347,6 +360,7 @@ async def seed_database(
         patient_count = await _seed_patients(session, password_hash, rng, now)
 
     appointment_count = await seed_appointments(session, clock)
+    review_count = await seed_reviews(session, clock)
     return {
         "chuyên khoa": len(specialties),
         "dịch vụ": len(services),
@@ -356,6 +370,7 @@ async def seed_database(
         "bệnh nhân": patient_count,
         "quản trị": len(admins),
         "lịch hẹn": appointment_count,
+        "đánh giá": review_count,
     }
 
 
@@ -397,6 +412,53 @@ async def seed_appointments(session: AsyncSession, clock: Clock) -> int:
     async with session.begin():
         await session.execute(delete(Notification).where(Notification.appointment_id.in_(created)))
     return len(created)
+
+
+async def seed_reviews(session: AsyncSession, clock: Clock) -> int:
+    """Đánh giá mẫu cho lịch Đã khám của bệnh nhân mẫu, gửi qua chính ReportService (FR-RPT-02).
+
+    Mỗi đánh giá gửi 1–48 giờ sau buổi khám; mốc đó chưa tới thì bỏ qua. Tài khoản demo không có
+    đánh giá sẵn để còn demo hộp thoại đánh giá. Chạy được riêng trên database đã có lịch hẹn mẫu
+    (lệnh `seed-reviews`).
+    """
+    from app.modules.reports.schemas import ReviewCreate
+    from app.modules.reports.service import ReportService
+
+    async with session.begin():
+        if (await session.execute(select(func.count()).select_from(Review))).scalar_one():
+            raise RuntimeError("Database đã có đánh giá; bỏ qua đánh giá mẫu.")
+        rows = (
+            await session.execute(
+                select(Appointment.id, Appointment.patient_id, Appointment.end_at)
+                .join(User, User.id == Appointment.patient_id)
+                .where(
+                    Appointment.status == AppointmentStatus.COMPLETED,
+                    User.email.like("%@demo.local"),
+                    User.email != DEMO_PATIENT[0],
+                )
+                .order_by(Appointment.end_at, Appointment.id)
+            )
+        ).all()
+
+    now = clock.now()
+    rng = random.Random(RANDOM_SEED + 2)
+    seed_clock = _SeedClock(now)
+    reports = ReportService(session, seed_clock)
+    created = 0
+    for appointment_id, patient_id, end_at in rows:
+        if rng.random() >= REVIEW_SHARE:
+            continue
+        seed_clock.at = end_at + timedelta(hours=rng.randint(1, 48))
+        if seed_clock.at > now:
+            continue
+        review = ReviewCreate(
+            rating=rng.choice(REVIEW_RATINGS), comment=rng.choice(REVIEW_COMMENTS)
+        )
+        await reports.create_review(
+            Actor(patient_id, UserRole.PATIENT, Channel.WEB), appointment_id, review
+        )
+        created += 1
+    return created
 
 
 @dataclass

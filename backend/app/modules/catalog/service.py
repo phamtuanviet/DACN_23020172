@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.actor import Actor
 from app.core.clock import Clock
+from app.core.config import Settings, get_settings
 from app.core.errors import AppError, field_error, forbidden, not_found, violated_constraint
 from app.core.timeutil import to_local
 from app.db.enums import UserRole
@@ -114,7 +115,15 @@ def _service_brief(service: Service) -> ServiceBrief:
     )
 
 
-def _doctor_out(row: repo.DoctorRow, services: list[Service]) -> DoctorOut:
+def _doctor_out(
+    row: repo.DoctorRow,
+    services: list[Service],
+    rating: tuple[float, int] | None,
+    min_count: int,
+) -> DoctorOut:
+    """Điểm trung bình chỉ hiện khi đủ `min_count` lượt: ít lượt thì điểm lộ số sao của từng
+    bệnh nhân (bác sĩ biết mình vừa khám ai). Số lượt vẫn hiện."""
+    average, count = rating if rating else (None, 0)
     return DoctorOut(
         id=row.doctor.user_id,
         name=row.name,
@@ -122,6 +131,8 @@ def _doctor_out(row: repo.DoctorRow, services: list[Service]) -> DoctorOut:
         gender=row.doctor.gender,
         specialty=SpecialtyRef(id=row.doctor.specialty_id, name=row.specialty_name),
         services=[_service_brief(s) for s in services],
+        rating_average=average if count >= min_count else None,
+        rating_count=count,
     )
 
 
@@ -179,9 +190,12 @@ def _doctor_admin(
 
 # ---------------------------------------------------------------------------- service
 class CatalogService:
-    def __init__(self, session: AsyncSession, clock: Clock) -> None:
+    def __init__(
+        self, session: AsyncSession, clock: Clock, settings: Settings | None = None
+    ) -> None:
         self._session = session
         self._clock = clock
+        self._settings = settings or get_settings()
 
     # ------------------------------------------------------------ đọc công khai (FR-CAT-04)
     async def list_specialties(self) -> list[SpecialtyOut]:
@@ -210,13 +224,23 @@ class CatalogService:
                 specialty_id=specialty_id,
                 service_id=service_id,
             )
-            services = await repo.services_by_doctor(
-                self._session, [r.doctor.user_id for r in rows]
+            doctor_ids = [r.doctor.user_id for r in rows]
+            services = await repo.services_by_doctor(self._session, doctor_ids)
+            ratings = await repo.ratings_by_doctor(self._session, doctor_ids)
+        min_count = self._settings.rating_min_count
+        return [
+            _doctor_out(
+                row,
+                services.get(row.doctor.user_id, []),
+                ratings.get(row.doctor.user_id),
+                min_count,
             )
-        return [_doctor_out(row, services.get(row.doctor.user_id, [])) for row in rows]
+            for row in rows
+        ]
 
     async def get_doctor(self, doctor_id: int) -> DoctorDetail:
-        """Hồ sơ bác sĩ (UC03). Bác sĩ bị khóa hoặc thuộc chuyên khoa đã ẩn: 404."""
+        """Hồ sơ bác sĩ (UC03) kèm điểm đánh giá (FR-RPT-03). Bác sĩ bị khóa hoặc thuộc chuyên khoa
+        đã ẩn: 404."""
         today = to_local(self._clock.now()).date()
         async with self._session.begin():
             row = await repo.get_active_doctor(self._session, doctor_id)
@@ -224,7 +248,13 @@ class CatalogService:
                 raise not_found("Không tìm thấy bác sĩ.")
             services = await repo.services_by_doctor(self._session, [doctor_id])
             shifts = await repo.current_shifts(self._session, doctor_id, today)
-        base = _doctor_out(row, services.get(doctor_id, []))
+            ratings = await repo.ratings_by_doctor(self._session, [doctor_id])
+        base = _doctor_out(
+            row,
+            services.get(doctor_id, []),
+            ratings.get(doctor_id),
+            self._settings.rating_min_count,
+        )
         return DoctorDetail(
             **base.model_dump(),
             bio=row.doctor.bio,

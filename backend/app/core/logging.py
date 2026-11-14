@@ -31,6 +31,7 @@ SENSITIVE_KEYS = frozenset(
         "summary",
         "note",
         "doctor_note",
+        "comment",
         "email",
         "recipient_email",
         "to",

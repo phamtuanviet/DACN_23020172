@@ -18,6 +18,7 @@ async def test_seed_fills_an_empty_database_once(
 ) -> None:
     counts = await seed_database(db, clock)
     appointments = counts.pop("lịch hẹn")
+    reviews = counts.pop("đánh giá")
     assert counts == {
         "chuyên khoa": 6,
         "dịch vụ": 20,
@@ -28,6 +29,7 @@ async def test_seed_fills_an_empty_database_once(
         "quản trị": 2,
     }
     assert appointments >= 40  # mỗi bệnh nhân mẫu 1–2 lịch, bỏ những lượt trùng giờ
+    assert reviews >= 10  # khoảng 60% lịch Đã khám, trừ tài khoản demo
     with pytest.raises(RuntimeError):
         await seed_database(db, clock)
 

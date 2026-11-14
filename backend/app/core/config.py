@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     booking_window_days: int = 30
     change_deadline_hours: int = 2
     max_active_appointments: int = 3
+    rating_min_count: int = 3  # dưới ngưỡng thì hồ sơ bác sĩ chưa hiện điểm (FR-RPT-03)
     proposal_ttl_min: int = 10
     agent_daily_message_limit: int = 50
     reminder_hours_before: int = 24

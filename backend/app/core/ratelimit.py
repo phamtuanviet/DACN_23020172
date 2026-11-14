@@ -5,7 +5,8 @@
 - IP thật lấy từ `request.client`: ở staging/production Uvicorn chạy
   `--proxy-headers` sau Caddy, và Caddy chỉ tin IP của Cloudflare (docs mục 11.3).
 - Valkey lỗi thì không chặn người dùng (swallow_errors) mà tạm đếm trong bộ nhớ tiến trình.
-- Đặt, đổi, hủy lịch: 10 lần/phút/người dùng (mỗi lần sinh một email, chặn spam email và dò id).
+- Đặt, đổi, hủy lịch (cả xác nhận đề xuất của Agent) và gửi đánh giá: chung một bộ đếm 10
+  lần/phút/người dùng (mỗi lần sinh email; chặn spam email và dò id).
 - Vượt giới hạn: slowapi ném RateLimitExceeded (HTTP 429), handler chung đổi thành `RATE_LIMITED`.
 
 Còn lại: giới hạn API chung 300 lần/phút/người dùng cho mọi endpoint cần đăng nhập.
@@ -38,4 +39,10 @@ limiter = Limiter(
     key_prefix="ratelimit",
     swallow_errors=True,
     in_memory_fallback_enabled=True,
+)
+
+# slowapi mặc định đếm theo URL, nên route có id (…/{id}/cancel) sẽ có bộ đếm riêng cho từng lịch
+# và người dùng đổi id là lách được. `scope` cố định gom mọi thao tác ghi lịch về một bộ đếm.
+appointment_write_limit = limiter.shared_limit(
+    APPOINTMENT_WRITE_LIMIT, scope="appointment-write", key_func=user_or_ip
 )

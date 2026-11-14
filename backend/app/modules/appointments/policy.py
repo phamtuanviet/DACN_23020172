@@ -150,6 +150,23 @@ def ensure_can_write_note(appointment: Appointment, actor: Actor) -> None:
         )
 
 
+def ensure_can_review(appointment: Appointment, actor: Actor) -> None:
+    """Đánh giá bác sĩ: chỉ chủ lịch (403), và chỉ lịch Đã khám (409 INVALID_TRANSITION; FR-RPT-02,
+    AC-19). Mỗi lịch một lần do UNIQUE trên `reviews.appointment_id` giữ."""
+    if not _is_owner(appointment, actor):
+        raise forbidden()
+    if appointment.status is not AppointmentStatus.COMPLETED:
+        raise invalid_transition("Chỉ đánh giá được lịch hẹn đã khám.", appointment.status)
+
+
+def can_review(appointment: Appointment, actor: Actor, *, reviewed: bool) -> bool:
+    return (
+        _is_owner(appointment, actor)
+        and appointment.status is AppointmentStatus.COMPLETED
+        and not reviewed
+    )
+
+
 def ensure_valid_status_change(
     appointment: Appointment, actor: Actor, target: AppointmentStatus, now: datetime
 ) -> None:
