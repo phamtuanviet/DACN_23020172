@@ -41,7 +41,10 @@ npm run dev          # http://localhost:3000, /api/* chuyển tới backend :800
 npm run lint && npm run typecheck && npm test
 npm run e2e          # Playwright; E2E_BASE_URL=https://staging... để chạy trên staging
 E2E_FAKE_LLM=1 npx playwright test e2e/agent.spec.ts   # e2e khung chat; backend chạy LLM_PROVIDER=fake
+E2E_COMPARE=1 npx playwright test e2e/compare.spec.ts --project=desktop   # so sánh web và trợ lý (AC-20)
 ```
+
+`e2e/compare.spec.ts` không chạy trong bộ e2e thường ngày: nó làm bốn tác vụ (đặt, đặt nhiều ràng buộc, đổi, hủy) trên web và, khi có thêm `E2E_COMPARE_AGENT=1` (backend chạy LLM thật, tốn phí), qua trợ lý; đếm lần bấm, ký tự gõ, đo thời gian chờ và ước thời gian thao tác theo Keystroke-Level Model, ghi kết quả vào `test-results/compare/`.
 
 Bộ e2e dùng dữ liệu seed và vừa khít giới hạn tốc độ của backend (đăng ký 5 lần/phút/IP, đăng nhập
 10 lần/phút/IP), nên chạy khung chat riêng như trên và đợi một phút giữa hai lần chạy cả bộ. Trên

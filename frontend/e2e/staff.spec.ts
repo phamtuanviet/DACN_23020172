@@ -1,10 +1,12 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 // Sprint 5: khu vực quản trị (AC-07, AC-08; FR-ADM-01..04) và bác sĩ (AC-09, AC-17) trên giao diện
-// thật. Dùng tài khoản quản trị, bác sĩ của seed: mật khẩu demo chỉ có ở development, staging thì
-// truyền E2E_DEMO_PASSWORD. Chỉ chạy project máy tính vì đăng nhập giới hạn 10 lần/phút/IP; bố cục
-// 360 px kiểm bằng setViewportSize ngay trong test. Bệnh nhân được tạo qua API bằng `request`
-// (ngữ cảnh riêng), để cookie phiên của bệnh nhân không đè lên phiên quản trị, bác sĩ trên trang.
+// thật; Sprint 6: dashboard (AC-18) và bệnh nhân đánh giá lịch vừa khám (AC-19). Dùng tài khoản quản
+// trị, bác sĩ của seed: mật khẩu demo chỉ có ở development, staging thì truyền E2E_DEMO_PASSWORD.
+// Chỉ chạy project máy tính vì đăng nhập giới hạn 10 lần/phút/IP; bố cục 360 px kiểm bằng
+// setViewportSize ngay trong test. Bệnh nhân được tạo qua API bằng `request` (ngữ cảnh riêng), để
+// cookie phiên của bệnh nhân không đè lên phiên quản trị, bác sĩ trên trang; khi cần trang của bệnh
+// nhân thì chép cookie phiên đó sang trình duyệt thay vì đăng nhập thêm lần nữa.
 
 const PASSWORD = process.env.E2E_DEMO_PASSWORD ?? "Demo12345";
 const WEEKDAYS = ["Chủ nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
@@ -36,7 +38,8 @@ async function noHorizontalScroll(page: Page) {
   expect(overflow).toBeLessThanOrEqual(0);
 }
 
-type Patient = { name: string; headers: Record<string, string> };
+type Cookies = Awaited<ReturnType<APIRequestContext["storageState"]>>["cookies"];
+type Patient = { name: string; headers: Record<string, string>; cookies: Cookies };
 let shared: Patient | undefined;
 
 /** Một bệnh nhân cho cả hai test của file: /auth/register giới hạn 5 lần/phút/IP. Lịch của test
@@ -61,7 +64,8 @@ async function registerPatient(request: APIRequestContext, stamp: string): Promi
   });
   expect(response.status()).toBe(201);
   const { access_token } = (await response.json()) as { access_token: string };
-  return { name, headers: { Authorization: `Bearer ${access_token}` } };
+  const { cookies } = await request.storageState(); // refresh token của phiên vừa đăng ký
+  return { name, headers: { Authorization: `Bearer ${access_token}` }, cookies };
 }
 
 type Slot = { start_at: string };
@@ -203,8 +207,33 @@ test("quản trị tạo danh mục, bác sĩ, ca làm; bệnh nhân đặt đư
   await page.getByRole("button", { name: "Lưu", exact: true }).click();
   await expect(page.getByText(`Đã lưu BS. ${doctor}`)).toBeVisible();
 
-  // Điện thoại 360 px: danh sách lịch hẹn dạng thẻ, không cuộn ngang
+  // AC-18: dashboard. Số lịch trong khoảng bằng tổng cột "Số lịch" của dạng bảng; đổi khoảng thời
+  // gian thì mọi số liệu theo khoảng mới (đối chiếu với database nằm ở test tích hợp test_reports)
+  await page.goto("/admin/dashboard");
+  const daily = page.getByRole("region", { name: "Lịch hẹn mỗi ngày · 14 ngày qua" });
+  await expect(daily.getByRole("group")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Kênh đặt lịch · 14 ngày" })).toBeVisible();
+  const inPeriod = page.getByRole("region", { name: "Lịch trong 14 ngày" });
+  const total = Number(
+    (await inPeriod.getByRole("paragraph").first().textContent())?.replace(".", ""),
+  );
+  await daily.getByRole("button", { name: "Xem dạng bảng" }).click();
+  const rows = daily.getByRole("row").filter({ has: page.getByRole("rowheader") });
+  await expect(rows).toHaveCount(14);
+  const perDay = await rows.evaluateAll((items) =>
+    items.map((row) => Number(row.querySelector("td")?.textContent ?? "0")),
+  );
+  expect(perDay.reduce((sum, value) => sum + value, 0)).toBe(total);
+  await page.getByLabel("Khoảng thời gian").selectOption({ label: "7 ngày qua" });
+  await expect(page).toHaveURL(/\/admin\/dashboard\?days=7$/);
+  await expect(page.getByRole("region", { name: "Lịch hẹn mỗi ngày · 7 ngày qua" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Tỷ lệ hủy · 7 ngày" })).toBeVisible();
+
+  // Điện thoại 360 px: dashboard và danh sách lịch hẹn dạng thẻ, không cuộn ngang
   await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto("/admin/dashboard");
+  await expect(page.getByRole("region", { name: "Lịch hôm nay" })).toBeVisible();
+  await noHorizontalScroll(page);
   await page.goto("/admin/appointments");
   await expect(page.getByText(/^Hiển thị \d+–\d+ trong \d+ lịch hẹn$/)).toBeVisible();
   await noHorizontalScroll(page);
@@ -272,4 +301,26 @@ test("bác sĩ xem lịch ngày, tuần; đánh dấu đã đến, ghi chú, đ�
   await expect(page).toHaveURL(/\/login$/);
   await page.goto("/doctor/schedule");
   await expect(page).toHaveURL(/\/login\?next=%2Fdoctor%2Fschedule$/);
+
+  // AC-19: bệnh nhân đánh giá lịch vừa khám (vẫn ở 360 px), mỗi lịch một lần
+  await page.context().addCookies(patient.cookies);
+  await page.goto(`/me/appointments?tab=history&id=${appointmentId}`);
+  await page.getByRole("button", { name: "Đánh giá buổi khám" }).click();
+  const dialog = page.getByRole("dialog", { name: "Đánh giá buổi khám" });
+  await dialog.getByRole("button", { name: "Gửi đánh giá" }).click();
+  await expect(dialog.getByText("Hãy chọn số sao trước khi gửi.")).toBeVisible();
+  await dialog.locator("label", { hasText: "5 sao" }).click();
+  await expect(dialog.getByText("5 trên 5 · Rất hài lòng")).toBeVisible();
+  await dialog.getByRole("textbox", { name: /Nhận xét/ }).fill("Bác sĩ giải thích rõ ràng.");
+  await dialog.getByRole("button", { name: "Gửi đánh giá" }).click();
+  await expect(page.getByText("Cảm ơn bạn đã đánh giá")).toBeVisible();
+  await expect(page.getByRole("img", { name: "5 trên 5 sao" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Đánh giá buổi khám" })).toHaveCount(0);
+  await noHorizontalScroll(page);
+  const again = await request.post(`/api/v1/appointments/${appointmentId}/review`, {
+    headers: patient.headers,
+    data: { rating: 1 },
+  });
+  expect(again.status()).toBe(409);
+  expect(((await again.json()) as { code: string }).code).toBe("ALREADY_REVIEWED");
 });
