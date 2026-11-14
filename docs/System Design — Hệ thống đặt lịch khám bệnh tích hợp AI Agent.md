@@ -1,10 +1,10 @@
 # System Design — Hệ thống đặt lịch khám bệnh tích hợp AI Agent
 
-Oct 10, 2026 · @Viet · Phiên bản 1.7
+Oct 10, 2026 · @Viet · Phiên bản 1.8
 
 Tài liệu này mô tả thiết kế hệ thống ở mức đủ để bắt tay viết code và đưa lên chạy thật (production): kiến trúc backend/frontend, database, API, các module, luồng dữ liệu, hạ tầng triển khai và các quyết định công nghệ kèm lý do. Căn cứ là PRD 0.1, SRS 1.0 và ERD (cùng ngày 10/10/2026); các mã BR, FR, NFR, AC, UC giữ nguyên như trong ba tài liệu đó.
 
-Bản 1.1 thay mọi lựa chọn chỉ phù hợp demo cục bộ ở bản 1.0 bằng lựa chọn vận hành được ở production; bản 1.2 chuyển frontend sang Next.js; bản 1.3 đồng bộ với khung project đã dựng; bản 1.4 bổ sung chi tiết của Scheduling Engine và API danh mục khi hiện thực Sprint 2; bản 1.5 bổ sung xem, đổi, hủy lịch và đổi trạng thái khi hiện thực Sprint 3; bản 1.6 hiện thực AI Agent (Sprint 4) với mô hình mặc định gpt-4o-mini; bản 1.7 hiện thực khu vực quản trị, bác sĩ và email (Sprint 5). Lịch sử thay đổi ở mục 14.3.
+Bản 1.1 thay mọi lựa chọn chỉ phù hợp demo cục bộ ở bản 1.0 bằng lựa chọn vận hành được ở production; bản 1.2 chuyển frontend sang Next.js; bản 1.3 đồng bộ với khung project đã dựng; bản 1.4 bổ sung chi tiết của Scheduling Engine và API danh mục khi hiện thực Sprint 2; bản 1.5 bổ sung xem, đổi, hủy lịch và đổi trạng thái khi hiện thực Sprint 3; bản 1.6 hiện thực AI Agent (Sprint 4) với mô hình mặc định gpt-4o-mini; bản 1.7 hiện thực khu vực quản trị, bác sĩ và email (Sprint 5); bản 1.8 hiện thực đánh giá bác sĩ, dashboard (P2) và chuẩn bị bộ đánh giá Agent, đo hiệu năng, so sánh web và Agent (Sprint 6). Lịch sử thay đổi ở mục 14.3.
 
 ## 1. Mục tiêu thiết kế
 
@@ -128,7 +128,7 @@ Mỗi quyết định có mã TD để tham chiếu. Tiêu chí chung: công ngh
 | TD-16 | Form | React Hook Form + Zod | Formik | Ít re-render; schema Zod vừa kiểm tra form vừa sinh thông báo lỗi tiếng Việt |
 | TD-17 | Gọi API | Client sinh từ OpenAPI (`openapi-typescript` + `openapi-fetch`) | Viết tay kiểu và hàm gọi | Backend là nguồn sự thật; đổi schema ở FastAPI thì TypeScript báo lỗi ngay khi build (G4) |
 | TD-18 | Ngày giờ | `date-fns` + `date-fns-tz` | Day.js; Moment | Hiển thị theo Asia/Ho_Chi_Minh bất kể múi giờ của máy người dùng; Moment đã ngừng phát triển |
-| TD-19 | Biểu đồ (P2) | Recharts | Chart.js | Component React thuần, đủ cho 4 biểu đồ của dashboard |
+| TD-19 | Biểu đồ (P2) | Vẽ bằng HTML/CSS, không thêm thư viện (đổi ở Sprint 6) | Recharts; Chart.js | Dashboard chỉ có cột theo ngày, thanh ngang theo bác sĩ và một thanh xếp chồng hai phần: vài chục dòng CSS, không thêm phụ thuộc vào bundle. Màu `chart-1`, `chart-2` đã qua kiểm tra phân biệt khi mù màu và tương phản ≥ 3:1; mỗi biểu đồ có tooltip khi rê chuột hoặc focus và dạng bảng |
 
 ### 3.3 AI Agent
 
@@ -255,7 +255,7 @@ Mũi tên nghĩa là "gọi hàm của". Quy tắc: không có vòng phụ thu�
 
 | Thành phần | Nội dung |
 | --- | --- |
-| `config.py` | `pydantic-settings` đọc biến môi trường và file secret trong `/run/secrets`; `APP_ENV` (development, staging, production) quyết định các mặc định an toàn: production tắt `/docs`, chặn seed, bắt buộc có đủ secret khi khởi động. Gom mọi tham số "đề xuất" của PRD (30 ngày, 2 giờ, 3 lịch, 10 phút, 50 tin nhắn, 24 giờ) để đổi không cần sửa code; tên, địa chỉ, số điện thoại phòng khám (`CLINIC_NAME`, `CLINIC_ADDRESS`, `CLINIC_PHONE`) hiện trong email |
+| `config.py` | `pydantic-settings` đọc biến môi trường và file secret trong `/run/secrets`; `APP_ENV` (development, staging, production) quyết định các mặc định an toàn: production tắt `/docs`, chặn seed, bắt buộc có đủ secret khi khởi động. Gom mọi tham số "đề xuất" của PRD (30 ngày, 2 giờ, 3 lịch, 10 phút, 50 tin nhắn, 24 giờ) và ngưỡng 3 lượt đánh giá mới hiện điểm bác sĩ (`RATING_MIN_COUNT`) để đổi không cần sửa code; tên, địa chỉ, số điện thoại phòng khám (`CLINIC_NAME`, `CLINIC_ADDRESS`, `CLINIC_PHONE`) hiện trong email |
 | `db.py` | Async engine, pool mỗi tiến trình 4 + overflow 2, `pool_pre_ping`, kết nối TLS; tổng kết nối của mọi replica được tính để nằm dưới giới hạn của database managed (mục 11.2). Một `AsyncSession` mỗi request. `transaction()` là ranh giới transaction của một thao tác service; bên trong `outer_transaction()` nó chạy trong SAVEPOINT, để xác nhận đề xuất của Agent khóa đề xuất, đặt lịch và đánh dấu đề xuất trong cùng một transaction (mục 6.4) |
 | `security.py` | Argon2id; tạo và kiểm tra JWT (PyJWT, HS256, có `kid` để xoay khóa); tạo, xoay vòng, thu hồi refresh token; dependency `current_user`, `require_roles(...)` |
 | `errors.py` | `AppError(code, message, status, details)`; handler chuyển mọi lỗi về dạng `{code, message, details}`; ánh xạ SQLSTATE `23P01` theo tên constraint |
@@ -275,7 +275,7 @@ Mũi tên nghĩa là "gọi hàm của". Quy tắc: không có vòng phụ thu�
 - Thu hồi: đăng xuất thu hồi cả family của token hiện tại (phiên đăng nhập trên thiết bị đó, gồm token tab khác vừa nhận trong khoảng ân hạn); đổi mật khẩu, yêu cầu xóa tài khoản và quản trị khóa tài khoản thu hồi mọi token của người dùng đó. Mọi luồng của auth (đăng nhập, refresh, đăng xuất, đổi mật khẩu, khóa tài khoản) khóa dòng `users` trước rồi mới khóa `refresh_tokens`, bằng `FOR NO KEY UPDATE` để không chặn khóa của khóa ngoại. Nhờ vậy, đổi mật khẩu đúng lúc một lượt refresh đang chạy sẽ chờ lượt đó commit rồi mới thu hồi, nên thu hồi được cả token vừa cấp.
 - Mỗi request, `current_user` giải mã access token rồi đọc dòng `users` theo khóa chính (một truy vấn khoảng 1 ms) để kiểm tra `is_active`; tài khoản bị khóa mất quyền ngay, không đợi token hết hạn. Quản trị mở khóa thì gỡ luôn khóa tạm do nhập sai mật khẩu; access token cấp trước lúc khóa, nếu còn hạn (tối đa 30 phút), dùng lại được sau khi mở khóa. Chấp nhận rủi ro này thay vì thêm cột mốc phiên vào `users`.
 - Đăng nhập sai tăng `failed_login_count`; lần sai thứ 5 đặt `locked_until = now + 15 phút` và trả ngay `429 ACCOUNT_LOCKED` kèm `details.locked_until` (FR-AUTH-03); đăng nhập đúng đặt lại bộ đếm. Thông báo lỗi không phân biệt "sai email" với "sai mật khẩu"; email không tồn tại vẫn băm thử một lần để thời gian phản hồi như nhau. Nhập sai mật khẩu hiện tại khi đổi mật khẩu cũng tính vào bộ đếm này, để access token bị lộ không dùng được vào việc đoán mật khẩu.
-- Giới hạn tốc độ theo IP: đăng nhập 10 lần/phút, đăng ký 5 lần/phút, refresh 60 lần/phút, đổi mật khẩu 5 lần/phút. Theo người dùng: đặt, đổi, hủy lịch 10 lần/phút (mỗi lần sinh một email, nên chặn spam email vào hộp thư người khác và dò id lịch hẹn).
+- Giới hạn tốc độ theo IP: đăng nhập 10 lần/phút, đăng ký 5 lần/phút, refresh 60 lần/phút, đổi mật khẩu 5 lần/phút. Theo người dùng: đặt, đổi, hủy lịch (kể cả xác nhận đề xuất của Agent) và gửi đánh giá dùng chung một bộ đếm 10 lần/phút (mỗi lần sinh một email, nên chặn spam email vào hộp thư người khác và dò id lịch hẹn). Bộ đếm có `scope` cố định: slowapi mặc định đếm theo URL, nên route có id lịch (`/appointments/{id}/cancel`) sẽ thành mỗi lịch một bộ đếm và đổi id là lách được.
 - Đánh đổi đã chấp nhận: lỗi `ACCOUNT_LOCKED` cho biết email có tài khoản. Điều này không lộ thêm gì vì đăng ký vốn trả `EMAIL_TAKEN` (mục 7.1); giới hạn theo IP làm việc dò email chậm lại. Muốn kín hơn thì đổi cả hai sang thông báo chung kèm email cho chủ tài khoản.
 
 **Phân quyền hai lớp.** Lớp 1 ở router: `require_roles(...)` chặn sai vai trò, trả 403. Lớp 2 ở service (`appointments/policy.py`): kiểm tra quyền trên từng bản ghi theo BR-05, trả 403 (AC-05). Lớp 2 là bắt buộc vì tool của Agent gọi thẳng service, không đi qua router.
@@ -287,7 +287,7 @@ Mũi tên nghĩa là "gọi hàm của". Quy tắc: không có vòng phụ thu�
 | Đổi, hủy | Của mình, trạng thái BOOKED, còn ≥ 2 giờ | — | Mọi lịch BOOKED, không giới hạn 2 giờ (FR-ADM-03) |
 | Đổi trạng thái | — | Lịch của mình trong ngày: BOOKED → ARRIVED, ARRIVED → COMPLETED, BOOKED → NO_SHOW | Mọi chuyển hợp lệ |
 | Ghi chú sau khám | Xem ghi chú lịch của mình | Ghi cho lịch của mình khi bệnh nhân đã đến hoặc đã khám, kể cả ngày đã qua | Xem |
-| Đánh giá (P2) | Lịch của mình đã COMPLETED, một lần | — | Xem |
+| Đánh giá (P2) | Lịch của mình đã COMPLETED, một lần, chỉ tự gửi trên web (Agent không chấm thay) | Không đọc đánh giá của từng lịch; hồ sơ công khai chỉ hiện điểm trung bình khi đủ 3 lượt | Xem trong chi tiết lịch để theo dõi chất lượng |
 | Thông tin bệnh nhân hiển thị | — | Họ tên, tuổi (tính từ ngày sinh), dịch vụ, giờ, lý do khám; các lần khám trước của bệnh nhân với chính bác sĩ đó (kèm ghi chú); không thấy email, số điện thoại, ngày sinh, lý do hủy | Đầy đủ, gồm email và số điện thoại để gọi lại |
 
 Tài khoản quản trị có quyền trên mọi dữ liệu bệnh nhân, nên trước khi go-live nên bật xác thực hai lớp (TOTP) cho vai trò ADMIN (mục 11.8).
@@ -316,7 +316,7 @@ Mọi lỗi trả cùng một dạng, đúng SRS 7.2:
 | 409 | `PATIENT_OVERLAP` | Vi phạm `excl_patient_overlap` (BR-09) |
 | 409 | `MAX_ACTIVE_APPOINTMENTS` | Đã có 3 lịch BOOKED sắp tới (BR-09) |
 | 409 | `CHANGE_DEADLINE_PASSED` | Còn dưới 2 giờ trước giờ khám; `details.clinic_phone` để liên hệ (BR-08) |
-| 409 | `INVALID_TRANSITION` | Chuyển trạng thái không có trong sơ đồ (FR-APT-06), đổi/hủy lịch không còn ở trạng thái Đã đặt, hoặc cập nhật buổi khám sai thời điểm (mục 5.5); `details.status` là trạng thái hiện tại |
+| 409 | `INVALID_TRANSITION` | Chuyển trạng thái không có trong sơ đồ (FR-APT-06), đổi/hủy lịch không còn ở trạng thái Đã đặt, cập nhật buổi khám sai thời điểm (mục 5.5), hoặc đánh giá lịch chưa Đã khám; `details.status` là trạng thái hiện tại |
 | 409 | `PROPOSAL_EXPIRED`, `PROPOSAL_NOT_PENDING` | Đề xuất quá 10 phút hoặc đã bị thay thế; đã xác nhận, từ chối hay thất bại trước đó (BR-06). Lỗi của endpoint confirm luôn kèm `details.proposal_status` |
 | 409 | `SHIFT_OVERLAP`, `EMAIL_TAKEN`, `ALREADY_REVIEWED` | Ca chồng ca; email đã tồn tại; lịch đã được đánh giá |
 | 422 | `VALIDATION_ERROR` | Sai định dạng dữ liệu; `details.fields` liệt kê lỗi từng trường |
@@ -610,7 +610,8 @@ Ví dụ payload của đề xuất BOOK:
 
 - `tool_call_logs`: một dòng cho mỗi lần gọi tool (FR-AGT-08), đủ để tính tỷ lệ lỗi, độ trễ từng tool, số lượt gọi cho mỗi tác vụ.
 - Log JSON cho mỗi lượt chat: `conversation_id`, thời gian tới token đầu, tổng thời gian, số token vào/ra lấy từ metadata phản hồi của LLM; dùng cho NFR-03 và theo dõi chi phí NFR-15.
-- Bộ kịch bản đánh giá trong `tests/agent_eval/` (30–50 file YAML; Sprint 4 có 15 kịch bản đầu, cách viết ở `tests/agent_eval/README.md`), mỗi kịch bản gồm: các tin nhắn đầu vào, đồng hồ cố định (ví dụ 10/10/2026 09:00), tool và tham số mong đợi, kết quả mong đợi, và kiểm tra an toàn bằng cách so database trước và sau (không lịch hẹn nào đổi khi chưa xác nhận). Bộ này có cả kịch bản prompt injection và kịch bản mô tả triệu chứng (NFR-08, AC-14, AC-15). Chạy cùng bộ kịch bản trên hai mô hình ở TD-21 để có số liệu so sánh cho báo cáo.
+- Bộ kịch bản đánh giá trong `tests/agent_eval/` (41 file YAML: 15 viết ở Sprint 4, 26 ở Sprint 6; cách viết ở `tests/agent_eval/README.md`), mỗi kịch bản gồm: nhóm (đặt, đổi, hủy, hết khung, triệu chứng, ngoài phạm vi, prompt injection, khác), các tin nhắn đầu vào, đồng hồ cố định (ví dụ 10/10/2026 09:00), tool và tham số mong đợi, kết quả mong đợi, và kiểm tra an toàn bằng cách so database trước và sau (không lịch hẹn nào đổi khi chưa xác nhận). Bộ này có cả kịch bản prompt injection và kịch bản mô tả triệu chứng (NFR-08, AC-14, AC-15). Cấu trúc kịch bản (khóa, tên tool, tham số, tham chiếu) được kiểm bằng unit test thường ngày, không cần LLM.
+- Bộ chạy ghi số đo của từng lượt từ log `agent.turn` (thời gian token đầu, cả lượt, số token), tổng hợp tỷ lệ đạt theo nhóm, p50/p90, chi phí ước tính, đạt hay chưa AC-15 và NFR-03, rồi ghi JSON vào `tests/agent_eval/results/` (không commit). `python -m tests.agent_eval.compare` đặt kết quả của hai mô hình ở TD-21 cạnh nhau thành bảng Markdown cho báo cáo.
 
 ### 6.8 Vận hành Agent ở production
 
@@ -675,7 +676,7 @@ Các chỉ mục bổ sung so với ERD (dòng đánh dấu ở trên và hai ch
 | --- | --- |
 | Bảng `refresh_tokens` (id uuid PK, user_id FK ON DELETE CASCADE, token_hash varchar(64) UNIQUE, family_id uuid, expires_at, revoked_at, replaced_by uuid, created_at, user_agent varchar(255), ip inet) | Thu hồi và xoay vòng refresh token (TD-07); thay quyết định "không có bảng refresh token" ở ERD mục 6 |
 | Cột `users.privacy_consent_at` (timestamptz) | Lưu thời điểm bệnh nhân đồng ý chính sách xử lý dữ liệu khi đăng ký (mục 11.8) |
-| Cột `users.anonymized_at` (timestamptz) | Đánh dấu tài khoản đã ẩn danh hóa theo yêu cầu xóa: họ tên, email, số điện thoại, ngày sinh bị thay bằng giá trị vô danh; lịch hẹn giữ lại cho thống kê nhưng không còn định danh được; bản sao email trong `notifications.recipient_email` và các cột chữ tự do của lịch hẹn (`reason`, `cancel_reason`, `doctor_note`) cũng bị xóa |
+| Cột `users.anonymized_at` (timestamptz) | Đánh dấu tài khoản đã ẩn danh hóa theo yêu cầu xóa: họ tên, email, số điện thoại, ngày sinh bị thay bằng giá trị vô danh; lịch hẹn giữ lại cho thống kê nhưng không còn định danh được; bản sao email trong `notifications.recipient_email`, các cột chữ tự do của lịch hẹn (`reason`, `cancel_reason`, `doctor_note`) và nhận xét đánh giá (`reviews.comment`, giữ số sao cho thống kê) cũng bị xóa |
 | Chỉ mục `conversations (patient_id, last_message_at DESC)` | Đếm hạn mức tin nhắn, mở lại hội thoại gần nhất |
 | Chỉ mục `refresh_tokens (user_id)`, `refresh_tokens (expires_at)` | Thu hồi theo người dùng; job dọn token hết hạn |
 
@@ -690,6 +691,7 @@ Tổng cộng 18 bảng: 17 bảng của ERD và `refresh_tokens`.
   - **2 tuần tới:** lịch BOOKED đặt bằng đồng hồ thật, khoảng 30% qua kênh AGENT; một phần được bệnh nhân đổi giờ hoặc hủy.
   - Tổng khoảng 220 lịch hẹn (SRS 6.3 ước 300): khoảng 75 sắp tới, 100 đã khám, 35 đã hủy, 15 vắng mặt. Tài khoản demo `lan@demo.local` luôn có 2 lịch sắp tới và vài lịch đã qua.
   - Lịch mẫu không kèm email vì địa chỉ @demo.local không có thật. Database đã nạp seed trước đó thêm lịch mẫu bằng `python -m app.cli seed-appointments`.
+  - **Đánh giá mẫu (Sprint 6):** khoảng 60% lịch Đã khám có đánh giá, gửi qua chính `ReportService` 1–48 giờ sau buổi khám, điểm lệch về hài lòng; tài khoản demo `lan@demo.local` không có đánh giá sẵn để còn demo hộp thoại đánh giá. Database đã có lịch mẫu từ trước thì thêm bằng `python -m app.cli seed-reviews`.
 - Tài khoản demo cố định (ví dụ `admin@demo.local`, `minh.tran@demo.local`, `lan@demo.local`) chỉ tồn tại ở dev và staging. Mật khẩu chung `Demo12345` chỉ dùng ở dev; ở staging (công khai trên Internet) lệnh seed hỏi mật khẩu khi chạy, vì giá trị nằm trong repo thì ai cũng đọc được.
 
 ### 7.6 Thời gian và múi giờ
@@ -745,8 +747,8 @@ API là REST + JSON với tiền tố `/api/v1`, một bộ endpoint dùng chung
 | --- | --- | --- | --- |
 | `GET /specialties` | Công khai | Chuyên khoa đang hoạt động | FR-CAT-04 |
 | `GET /services?q=&specialty_id=` | Công khai | Tìm dịch vụ có dấu và không dấu | FR-CAT-04 |
-| `GET /doctors?q=&specialty_id=&service_id=` | Công khai | Tìm bác sĩ | FR-CAT-04 |
-| `GET /doctors/{id}` (mới) | Công khai | Hồ sơ bác sĩ, dịch vụ, lịch làm việc trong tuần, điểm đánh giá trung bình (P2) | UC03, FR-RPT-03 |
+| `GET /doctors?q=&specialty_id=&service_id=` | Công khai | Tìm bác sĩ; mỗi bác sĩ kèm `rating_average`, `rating_count` như hồ sơ | FR-CAT-04, FR-RPT-03 |
+| `GET /doctors/{id}` (mới) | Công khai | Hồ sơ bác sĩ, dịch vụ, lịch làm việc trong tuần, điểm đánh giá trung bình (P2). `rating_average` làm tròn một chữ số, rỗng khi chưa đủ `RATING_MIN_COUNT` lượt (mặc định 3): bác sĩ biết mình vừa khám ai, nên điểm của một, hai lượt lộ số sao của từng bệnh nhân. `rating_count` luôn có | UC03, FR-RPT-03 |
 | `GET /availability?service_id=&doctor_id=&date_from=&date_to=&time_from=&time_to=` | Công khai | Khung trống theo ngày, kèm `nearest_dates` | FR-SCH-01..05 |
 | `GET /availability/earliest?service_id=&by_doctor=` (mới) | Công khai | Khung trống sớm nhất trong 30 ngày của từng dịch vụ (lặp `service_id`, tối đa 50) hoặc từng bác sĩ (mục 5.2) | FR-SCH-05 |
 
@@ -761,7 +763,7 @@ API là REST + JSON với tiền tố `/api/v1`, một bộ endpoint dùng chung
 | `POST /appointments/{id}/cancel` | Bệnh nhân (còn ≥ 2 giờ), quản trị | Hủy kèm lý do tùy chọn `{reason}` | FR-APT-03, FR-ADM-03 |
 | `PATCH /appointments/{id}/status` | Bác sĩ (lịch của mình, trong ngày), quản trị | Đổi trạng thái theo sơ đồ; body `{status: ARRIVED\|COMPLETED\|NO_SHOW}` | FR-DOC-02, FR-APT-06 |
 | `PATCH /appointments/{id}/note` (mới) | Bác sĩ của lịch | Ghi chú sau khám ≤ 1.000 ký tự, body `{note}` bắt buộc có trường `note`, rỗng hoặc `null` là xóa (body thiếu trường bị 422, không âm thầm xóa); chỉ khi lịch ARRIVED hoặc COMPLETED (409 `INVALID_TRANSITION`); history `NOTE_UPDATE` không chứa nội dung ghi chú; trả chi tiết lịch | FR-DOC-03 |
-| `POST /appointments/{id}/review` (mới, P2) | Bệnh nhân | Đánh giá lịch đã COMPLETED | FR-RPT-02 |
+| `POST /appointments/{id}/review` (mới, P2) | Bệnh nhân | Đánh giá lịch đã COMPLETED: `{rating: 1–5, comment?: ≤ 500 ký tự}`, trả 201 `{rating, comment, created_at}`. Lỗi: 403 không phải chủ lịch, 409 `INVALID_TRANSITION` khi chưa Đã khám, 409 `ALREADY_REVIEWED`, 429 chung bộ đếm ghi lịch. `GET /appointments/{id}` trả thêm `review` (chủ lịch và quản trị; bác sĩ nhận rỗng) và `can_review` | FR-RPT-02, AC-19 |
 | `GET /doctor/schedule?date_from=&date_to=` | Bác sĩ | Lịch khám ngày/tuần của chính mình, tối đa 31 ngày: lịch ở mọi trạng thái (họ tên, tuổi, dịch vụ, lý do, có ghi chú hay chưa), giờ làm từng ngày trải từ ca, ngày nghỉ trong khoảng và tối đa 3 ngày nghỉ sắp tới | FR-DOC-01 |
 
 **Quản trị**
@@ -775,7 +777,7 @@ API là REST + JSON với tiền tố `/api/v1`, một bộ endpoint dùng chung
 | `GET /admin/appointments?date_from=&date_to=&doctor_id=&status=&channel=&needs_attention=&q=&page=&page_size=` | Mọi lịch hẹn, có lọc, xếp theo giờ khám, phân trang; `q` tìm theo mã lịch, họ tên (không dấu) hoặc số điện thoại bệnh nhân; mỗi lịch kèm liên hệ bệnh nhân và `attention_source` | FR-ADM-03 |
 | `PATCH /admin/appointments/{id}/attention` (mới) | Gỡ cờ cần xử lý, hoặc tự gắn cờ cho lịch BOOKED; body `{needs_attention}` | FR-ADM-04 |
 | `GET /admin/support-requests?status=`, `PATCH /admin/support-requests/{id}` | Hàng chờ chuyển nhân viên (đang mở cũ nhất trước) kèm họ tên, số điện thoại, email bệnh nhân và tóm tắt của trợ lý; đánh dấu DONE (ghi người xử lý, thời điểm) hoặc mở lại | FR-ADM-04 |
-| `GET /admin/stats?from=&to=` (P2) | Số liệu dashboard | FR-RPT-01 |
+| `GET /admin/stats?date_from=&date_to=` (P2) | Số liệu dashboard, mặc định 14 ngày tính đến hôm nay, tối đa 31 ngày: số lịch theo ngày khám (đủ mọi ngày, theo trạng thái), tổng theo trạng thái, tỷ lệ hủy (đã hủy / mọi lịch) và vắng mặt (vắng / đã đến + đã khám + vắng) của khoảng đang xem và khoảng liền trước, số lịch theo bác sĩ, số lịch được đặt trong khoảng theo kênh web và trợ lý. Không có dữ liệu định danh bệnh nhân | FR-RPT-01, AC-18 |
 
 Mọi endpoint `/admin/*` yêu cầu vai trò ADMIN. Quản trị đổi, hủy lịch bằng chính endpoint `/appointments/{id}/…`; service nhận ra vai trò ADMIN để bỏ mốc 2 giờ và ghi kênh ADMIN.
 
@@ -1026,6 +1028,7 @@ flowchart TB
 - Ngày giờ luôn hiển thị theo Asia/Ho_Chi_Minh, dạng `Thứ Bảy, 17/10/2026 08:00`, cả khi render trên server lẫn trình duyệt, để HTML server và client khớp nhau khi hydrate.
 - Nút Đổi lịch, Hủy bị khóa khi `can_change = false` (backend tính theo BR-08) và hiện số điện thoại phòng khám (UC06 ngoại lệ 1a).
 - Toàn bộ chữ trên giao diện là tiếng Việt, gom vào một file hằng số để dễ rà soát.
+- Biểu đồ dashboard dùng token `chart-1` (Web, và mọi biểu đồ một chuỗi) và `chart-2` (Trợ lý), không dùng màu trạng thái; chữ, số luôn dùng màu chữ; mỗi biểu đồ có tooltip khi rê chuột hoặc focus (cột theo ngày chuyển bằng phím mũi tên) và nút "Xem dạng bảng". Sao đánh giá dùng token `star` (tương phản 3,6:1).
 - File trong `/_next/static` có hash trong tên, được cache 1 năm ở Cloudflare và trình duyệt; HTML không cache ở CDN vì mỗi trang mang nonce CSP riêng. File tĩnh của các bản cũ được giữ thêm 14 ngày (mục 11.5) để người đang mở bản cũ không gặp lỗi tải chunk.
 - Sentry SDK cho Next.js bắt lỗi cả phía server lẫn trình duyệt, kèm phiên bản phát hành, không kèm nội dung form.
 - Trang đăng ký có ô đồng ý chính sách xử lý dữ liệu và liên kết tới chính sách bảo mật; trang hồ sơ có nút yêu cầu xóa tài khoản (mục 11.8).
@@ -1577,9 +1580,10 @@ Mỗi tiêu chí nghiệm thu P0 có ít nhất một test tự động; test ba
 | API, phân quyền | httpx `AsyncClient` | Duyệt tự động mọi route trong `app.routes`: thiếu token → 401, sai vai trò → 403; bệnh nhân A thao tác lịch của B → 403; quá giới hạn → 429 | AC-05, AC-06, NFR-06, NFR-07 |
 | Frontend | Vitest + Testing Library | Bộ chọn khung giờ, ProposalCard (đếm ngược, khóa nút), ánh xạ mã lỗi, đọc sự kiện SSE | SRS 7.1 |
 | E2E | Playwright | Đăng ký → đặt lịch → thấy trong "Sắp tới"; đổi, hủy; quản trị tạo chuyên khoa, dịch vụ, bác sĩ, ca làm rồi bệnh nhân đặt được ngay; thêm ngày nghỉ thấy lịch bị ảnh hưởng, hủy từ hàng chờ; bác sĩ xem lịch ngày, tuần, đánh dấu đã đến, ghi chú, đã khám; chạy cả viewport 360 px | AC-01, AC-07, AC-08, AC-09, AC-17, NFR-11 |
-| Agent | Bộ kịch bản YAML + LLM thật, đồng hồ cố định | 30–50 kịch bản: đặt, đổi, hủy, hết khung, triệu chứng, ngoài phạm vi, prompt injection | AC-10..15, NFR-08 |
-| Hiệu năng | k6 trên staging, 20 người dùng ảo trong 5 phút, đi qua Cloudflare và Caddy | `/availability` và các API đọc chính | NFR-01, NFR-02 |
+| Agent | Bộ kịch bản YAML + LLM thật, đồng hồ cố định | 41 kịch bản: đặt, đổi, hủy, hết khung, triệu chứng, ngoài phạm vi, prompt injection; số đo token đầu, cả lượt, token, chi phí; so sánh mô hình bằng `compare.py` | AC-10..15, NFR-03, NFR-08, NFR-15 |
+| Hiệu năng | `tests/perf/read_api.py` (httpx bất đồng bộ, không thêm thư viện) trên staging, 20 người dùng ảo trong 5 phút, đi qua Cloudflare và Caddy | `/availability` và các API đọc chính kể cả API cần đăng nhập; p50, p95, p99 theo endpoint và theo nhóm NFR | NFR-01, NFR-02 |
 | Người dùng thật | 5–10 người thử, bấm giờ | Đặt lịch lần đầu trên web; làm cùng tác vụ bằng Agent để so sánh | NFR-10, AC-20 |
+| So sánh web và Agent | Playwright `e2e/compare.spec.ts` (chỉ chạy khi `E2E_COMPARE=1`) | Bốn tác vụ (đặt đơn giản, đặt nhiều ràng buộc, đổi, hủy) làm trên web và qua trợ lý: hoàn thành, số lần bấm, số ký tự gõ, thời gian chờ hệ thống, thời gian thao tác ước tính theo Keystroke-Level Model | AC-20, PRD mục 2 |
 | Smoke sau deploy | Playwright (bộ nhỏ) + `/health/ready` | Staging: đăng nhập, xem khung trống, đặt rồi hủy một lịch bằng tài khoản thử. Production: chỉ kiểm tra đọc, không tạo lịch thật | Mục 11.5 |
 | Bảo mật | Trivy, pip-audit, npm audit, gitleaks; OWASP ZAP baseline trên staging | Lỗ hổng thư viện, image và cấu hình HTTP | NFR-05 |
 | Khôi phục | Diễn tập hằng tháng | Khôi phục PITR vào staging, đo RTO | Mục 7.7 |
@@ -1668,6 +1672,8 @@ Các điểm sau là quyết định ở mức thiết kế. SRS mục 2.2, 2.3 
 - Kết quả xác nhận đề xuất được backend ghi thành tin nhắn ASSISTANT, không gọi thêm LLM.
 - Danh mục không có thao tác xóa cứng; "xóa" trên giao diện là ẩn (`is_active = false`), nên FR-CAT-05 luôn được thỏa.
 - Phạm vi PRD: chạy với dữ liệu bệnh nhân thật (PRD 0.1 xếp ngoài phạm vi); khuyến nghị TOTP cho quản trị (chưa có trong SRS).
+- FR-RPT-03: điểm trung bình chỉ hiện khi bác sĩ có từ 3 lượt đánh giá (`RATING_MIN_COUNT`), số lượt luôn hiện; tránh lộ số sao của từng bệnh nhân.
+- NFR-01, NFR-02 đo bằng script httpx trong repo thay cho Locust hoặc k6, cùng thông số 20 người dùng ảo trong 5 phút.
 
 ### 14.3 Lịch sử thay đổi
 
@@ -1701,3 +1707,5 @@ Các điểm sau là quyết định ở mức thiết kế. SRS mục 2.2, 2.3 
 **Bản 1.6 (so với 1.5):** hiện thực AI Agent ở Sprint 4, không đổi schema. Mô hình mặc định đổi sang OpenAI gpt-4o-mini, vẫn hỗ trợ Anthropic, thêm mô hình giả theo luật cho e2e (TD-21, mục 11.6). Thêm `GET /agent/status` (mục 8.2); sự kiện SSE `services`, `slots` và mã `AGENT_TIMEOUT` (mục 4.7, 8.4); confirm chạy trong `outer_transaction` với SAVEPOINT, lỗi kèm `details.proposal_status` (mục 4.5, 4.7, 6.4); chi tiết vòng đời lượt chat, tìm từ khóa nhiều cụm, cách chọn khung thay thế, nhãn trạng thái tool (mục 6.1, 6.3); đơn giá token cấu hình được (mục 6.8); khung chat trên frontend (mục 9.2, 9.5).
 
 **Bản 1.7 (so với 1.6):** hiện thực khu vực quản trị, bác sĩ và email ở Sprint 5, không đổi schema. Thêm `/admin/doctors` (gán dịch vụ bằng `service_ids` trong cùng request thay cho `PUT /admin/doctors/{id}/services`), `/admin/appointments` có tìm kiếm và phân trang, gắn hoặc gỡ cờ thủ công, `/admin/support-requests`, `GET /doctor/schedule?date_from=&date_to=` (thay `from`, `to` cho thống nhất với `/availability`), `PATCH /appointments/{id}/note`, `previous_visits` trong chi tiết lịch (mục 8.2); khóa bác sĩ không tự gắn cờ lịch, quản trị xử lý theo `upcoming_count` (mục 5.7); bác sĩ ghi chú khi bệnh nhân đã đến hoặc đã khám (mục 4.6); worker gửi email, bỏ qua `.local` ngoài development, cấu hình `CLINIC_NAME`, `CLINIC_ADDRESS` (mục 4.5, 10.5); frontend các màn quản trị, bác sĩ, hộp thoại đổi, hủy chuyển lên `shared/appointments` (mục 9.2–9.4). Sau hai lượt soát phân quyền: email không có họ tên, tối đa 5 email/giờ/địa chỉ (trừ email nhắc và email phòng khám đổi, hủy), bỏ email chờ quá 24 giờ, `last_error` không lưu thông báo lỗi SMTP, phong bì SMTP ghi rõ người nhận (mục 10.5); email đăng ký chỉ nhận chữ Latin, số và `._+-` (mục 8.2); mọi luồng của auth khóa `users` trước `refresh_tokens`, token vừa xoay chỉ được ân hạn khi family còn token sống, đăng xuất thu hồi cả family (mục 4.6); `PATCH /appointments/{id}/note` bắt buộc trường `note`, bác sĩ không tự đổi họ tên qua `PATCH /me` (mục 8.2); mở khóa gỡ khóa tạm do sai mật khẩu (mục 4.6); trang Tài khoản `/doctor/account`, `/admin/account` để bác sĩ, quản trị đổi mật khẩu ban đầu (mục 9.2).
+
+**Bản 1.8 (so với 1.7):** Sprint 6, không đổi schema. Đánh giá bác sĩ: `POST /appointments/{id}/review`, chi tiết lịch trả `review`, `can_review`, hồ sơ và danh sách bác sĩ có `rating_average`, `rating_count` với ngưỡng `RATING_MIN_COUNT` (mục 4.5, 4.6, 8.2); đánh giá lịch chưa Đã khám trả `INVALID_TRANSITION` (mục 4.7); nhận xét bị xóa khi ẩn danh hóa (mục 7.4). Dashboard: `GET /admin/stats?date_from=&date_to=` thay `from`, `to` (mục 8.2), biểu đồ tự vẽ bằng HTML/CSS thay Recharts (TD-19, mục 9.6). Sau lượt soát phân quyền: đặt, đổi, hủy, xác nhận đề xuất và gửi đánh giá dùng chung một bộ đếm 10 lần/phút theo người dùng (trước đó route có id lịch đếm riêng từng lịch), Agent không gửi đánh giá thay bệnh nhân, khóa `comment` bị che trong log (mục 4.6). Đánh giá Agent: 41 kịch bản theo nhóm, số đo từng lượt, kết quả JSON và bảng so sánh mô hình (mục 6.7). Kiểm thử: script đo hiệu năng API đọc, Playwright so sánh web và Agent (mục 12). Seed thêm đánh giá mẫu; lệnh `seed-reviews` cho database đã nạp seed trước đó (mục 7.5).
