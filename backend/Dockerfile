@@ -19,7 +19,6 @@ COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen
 COPY . .
 CMD ["uvicorn", "--factory", "app.main:create_app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-
 FROM base AS build
 COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-dev
@@ -29,7 +28,11 @@ FROM python:${PYTHON_VERSION}-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:$PATH"
-RUN groupadd --gid 10001 app && useradd --uid 10001 --gid 10001 --no-create-home app
+# Vá gói Debian của image gốc: image python chính thức có thể chậm vài ngày so với bản vá bảo mật,
+# mà Trivy chặn deploy khi có lỗ hổng HIGH/CRITICAL đã có bản vá.
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 app && useradd --uid 10001 --gid 10001 --no-create-home app
 WORKDIR /app
 COPY --from=build --chown=10001:10001 /app /app
 USER 10001
