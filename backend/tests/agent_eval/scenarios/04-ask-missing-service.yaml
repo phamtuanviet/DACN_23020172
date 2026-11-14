@@ -1,4 +1,5 @@
 title: Thiếu dịch vụ thì hỏi lại, không tự chọn dịch vụ (UC09 bước 3)
+category: dat
 turns:
   - user: Cho tôi đặt lịch sáng thứ Hai tuần sau
     expect:

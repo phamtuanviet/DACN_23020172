@@ -1,0 +1,15 @@
+title: Đổi sang bác sĩ khác cùng giờ thì đề xuất RESCHEDULE với bác sĩ mới (UC10, FR-SCH-04)
+category: doi
+appointments:
+  - {key: lan_mon, patient: lan, doctor: derm_minh, service: derm, start: "2026-10-12T08:00:00+07:00"}
+turns:
+  - user: Lịch khám da liễu 8 giờ thứ Hai tuần sau của tôi, đổi sang bác sĩ Thu Hà cùng giờ được không?
+    expect:
+      tools: [get_my_appointments, find_available_slots]
+      args:
+        find_available_slots: {doctor_id: "@derm_ha", date_from: "2026-10-12"}
+  - user: Được, đổi giúp tôi
+    expect:
+      proposal: {type: RESCHEDULE, appointment_id: "@lan_mon", doctor_id: "@derm_ha", start_at: "2026-10-12T08:00:00+07:00"}
+  - confirm: true
+    expect_appointment: {id: "@lan_mon", start_at: "2026-10-12T08:00:00+07:00", status: BOOKED}

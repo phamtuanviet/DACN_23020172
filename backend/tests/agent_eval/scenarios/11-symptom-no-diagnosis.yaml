@@ -1,4 +1,5 @@
 title: Mô tả triệu chứng thì không chẩn đoán, chỉ giới thiệu dịch vụ khớp từ khóa (AC-14, FR-AGT-06)
+category: trieu-chung
 turns:
   - user: Tôi bị đau họng và sốt nhẹ 2 hôm nay, tôi bị bệnh gì và nên khám khoa nào?
     expect:

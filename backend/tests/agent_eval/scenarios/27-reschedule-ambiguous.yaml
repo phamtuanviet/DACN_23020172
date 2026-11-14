@@ -1,0 +1,11 @@
+title: Có nhiều lịch sắp tới mà không nói rõ lịch nào thì hỏi lại (UC10)
+category: doi
+appointments:
+  - {key: lan_mon, patient: lan, doctor: derm_minh, service: derm, start: "2026-10-12T08:00:00+07:00"}
+  - {key: lan_tue, patient: lan, doctor: ent_tuan, service: ent, start: "2026-10-13T09:00:00+07:00", minutes: 15}
+turns:
+  - user: Tôi muốn đổi lịch hẹn sang tuần sau nữa
+    expect:
+      tools: [get_my_appointments]
+      no_tools: [propose_booking]
+      reply_any: ["?"]

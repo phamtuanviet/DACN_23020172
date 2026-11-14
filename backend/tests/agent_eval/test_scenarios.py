@@ -3,6 +3,7 @@
 Mỗi kịch bản: đồng hồ cố định, lịch hẹn có sẵn, các lượt người dùng nói và điều mong đợi (tool
 được gọi và tham số, thẻ đề xuất, câu trả lời có hoặc không có cụm từ). Sau mỗi lượt chat, bảng
 appointments phải giữ nguyên (chỉ bước bấm Xác nhận được đổi): vi phạm là lỗi an toàn nghiêm trọng.
+Mỗi lượt còn ghi thời gian token đầu, thời gian cả lượt, số token (NFR-03, NFR-15) để tổng hợp.
 """
 
 import re
@@ -23,10 +24,11 @@ from app.core.timeutil import to_local
 from app.db.enums import AppointmentStatus, Channel, ProposalStatus, UserRole
 from app.db.models.agent import AgentProposal, ToolCallLog
 from app.db.models.appointments import Appointment
+from app.modules.agent import service as agent_service
 from app.modules.agent.llm import build_chat_model
 from app.modules.appointments.codes import new_appointment_code
 from tests.agent_eval.clinic import build_eval_clinic
-from tests.agent_eval.conftest import RUN
+from tests.agent_eval.conftest import RUN, ScenarioResult
 from tests.integration.agent_support import agent_settings, parse_sse, use_agent
 from tests.integration.conftest import MutableClock
 from tests.integration.factories import bearer
@@ -40,12 +42,40 @@ SCENARIOS = {
 DEFAULT_NOW = "2026-10-10T09:00:00+07:00"  # Thứ Bảy
 
 
+TURN_FIELDS = (
+    "outcome",
+    "first_token_ms",
+    "total_ms",
+    "llm_calls",
+    "tool_calls",
+    "input_tokens",
+    "output_tokens",
+)
+
+
 class ScenarioFailed(AssertionError):
     pass
 
 
 class SafetyViolation(AssertionError):
     pass
+
+
+class TurnLog:
+    """Bọc logger của service Agent, giữ lại sự kiện `agent.turn` (thời gian, token) của mỗi lượt
+    chat; mọi lời gọi log khác chuyển nguyên cho logger gốc."""
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+        self.turns: list[dict[str, Any]] = []
+
+    def info(self, event: str, **fields: Any) -> Any:
+        if event == "agent.turn":
+            self.turns.append({key: fields.get(key) for key in TURN_FIELDS})
+        return self._inner.info(event, **fields)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
 
 
 def _resolve(value: Any, ids: dict[str, int]) -> Any:
@@ -200,8 +230,13 @@ async def test_scenario(
     db: AsyncSession,
     clock: MutableClock,
     eval_settings: Any,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     scenario = SCENARIOS[name]
+    result = ScenarioResult(name, scenario.get("category", "khac"))
+    turn_log = TurnLog(agent_service.log)
+    monkeypatch.setattr(agent_service, "log", turn_log)
+    result.turns = turn_log.turns
     clock.at = datetime.fromisoformat(scenario.get("now", DEFAULT_NOW))
     ids = await build_eval_clinic(db)
     await _seed_appointments(db, scenario.get("appointments", []), ids)
@@ -250,9 +285,10 @@ async def test_scenario(
             except ScenarioFailed as exc:
                 raise ScenarioFailed(f"lượt {index}: {exc}") from exc
     except SafetyViolation as exc:
-        RUN.safety[name] = str(exc)
+        result.outcome, result.reason = "safety", str(exc)
         raise
     except ScenarioFailed as exc:
-        RUN.failed[name] = str(exc)
+        result.outcome, result.reason = "failed", str(exc)
         raise
-    RUN.passed.append(name)
+    finally:
+        RUN.results.append(result)

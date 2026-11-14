@@ -1,0 +1,8 @@
+title: Hỏi giá dịch vụ thì trả lời theo giá tham khảo trong kết quả tool (FR-CAT-04, docs mục 6.2)
+category: khac
+turns:
+  - user: Khám tai mũi họng ở đây giá bao nhiêu vậy?
+    expect:
+      tools: [search_services]
+      no_tools: [propose_booking]
+      reply_any: ["250.000", "250 000", "250k", "250 nghìn"]

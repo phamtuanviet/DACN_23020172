@@ -1,0 +1,19 @@
+title: Buổi sáng đã kín thì đưa khung buổi chiều hoặc ngày gần nhất (AC-11, FR-AGT-05)
+category: het-khung
+# Bác sĩ tai mũi họng duy nhất đã kín cả sáng Thứ Hai 12/10 (08:00–11:30).
+appointments:
+  - {key: o1, patient: other, doctor: ent_tuan, service: ent, start: "2026-10-12T08:00:00+07:00", minutes: 30}
+  - {key: o2, patient: other, doctor: ent_tuan, service: ent, start: "2026-10-12T08:30:00+07:00", minutes: 30}
+  - {key: o3, patient: other, doctor: ent_tuan, service: ent, start: "2026-10-12T09:00:00+07:00", minutes: 30}
+  - {key: o4, patient: other, doctor: ent_tuan, service: ent, start: "2026-10-12T09:30:00+07:00", minutes: 30}
+  - {key: o5, patient: other, doctor: ent_tuan, service: ent, start: "2026-10-12T10:00:00+07:00", minutes: 30}
+  - {key: o6, patient: other, doctor: ent_tuan, service: ent, start: "2026-10-12T10:30:00+07:00", minutes: 30}
+  - {key: o7, patient: other, doctor: ent_tuan, service: ent, start: "2026-10-12T11:00:00+07:00", minutes: 30}
+turns:
+  - user: Tôi muốn khám tai mũi họng sáng thứ Hai tuần sau
+    expect:
+      tools: [find_available_slots]
+      args:
+        find_available_slots: {service_id: "@ent", date_from: "2026-10-12", part_of_day: morning}
+      no_tools: [propose_booking]
+      reply_any: ["chiều", "13:30", "13/10", "thứ ba"]

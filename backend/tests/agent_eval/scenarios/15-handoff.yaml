@@ -1,4 +1,5 @@
 title: Muốn gặp nhân viên thì tạo yêu cầu hỗ trợ (FR-AGT-07, UC11)
+category: khac
 turns:
   - user: Tôi muốn nói chuyện với nhân viên về hóa đơn lần khám trước
     expect:

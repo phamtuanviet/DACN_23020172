@@ -1,0 +1,10 @@
+title: Buổi tối không có ca thì báo không còn khung và đưa phương án gần nhất (AC-11, FR-AGT-05)
+category: het-khung
+turns:
+  - user: Tôi muốn khám nội tổng quát tối thứ Ba tuần sau, sau 6 giờ chiều
+    expect:
+      tools: [find_available_slots]
+      args:
+        find_available_slots: {service_id: "@internal", date_from: "2026-10-13", part_of_day: evening}
+      no_tools: [propose_booking]
+      reply_any: ["chiều", "sáng", "13:30", "14/10"]

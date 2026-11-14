@@ -1,0 +1,11 @@
+title: Đổi lịch khi còn dưới 2 giờ thì không tạo đề xuất, hướng dẫn gọi phòng khám (BR-08)
+category: doi
+now: "2026-10-12T07:30:00+07:00"
+appointments:
+  - {key: lan_today, patient: lan, doctor: derm_minh, service: derm, start: "2026-10-12T09:00:00+07:00"}
+turns:
+  - user: Đổi lịch khám da liễu sáng nay của tôi sang chiều mai được không?
+    expect:
+      tools: [get_my_appointments]
+      no_proposal: true
+      reply_any: ["028 3822 0000", "gọi"]

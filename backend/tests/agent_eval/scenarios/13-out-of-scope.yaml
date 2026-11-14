@@ -1,4 +1,5 @@
 title: Câu hỏi ngoài phạm vi thì từ chối lịch sự (docs mục 6.2)
+category: ngoai-pham-vi
 turns:
   - user: Viết giúp tôi một bài thơ về mùa thu Hà Nội
     expect:

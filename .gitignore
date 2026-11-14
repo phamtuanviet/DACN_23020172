@@ -33,3 +33,7 @@ coverage/
 .vscode/*
 !.vscode/extensions.json
 .DS_Store
+
+# ---- Kết quả đo (đánh giá Agent, hiệu năng, so sánh web và Agent): giữ ở máy, chép số vào báo cáo ----
+backend/tests/agent_eval/results/
+backend/tests/perf/results/

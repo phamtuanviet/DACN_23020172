@@ -1,0 +1,9 @@
+title: '"Ngày kia" tính từ Thứ Bảy 10/10 là Thứ Hai 12/10 (FR-AGT-03)'
+category: dat
+turns:
+  - user: Ngày kia tôi muốn khám tai mũi họng buổi sáng
+    expect:
+      tools: [find_available_slots]
+      args:
+        find_available_slots: {service_id: "@ent", date_from: "2026-10-12", part_of_day: morning}
+      reply_any: ["12/10"]

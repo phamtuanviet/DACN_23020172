@@ -1,4 +1,5 @@
 title: Tìm khung của đúng bác sĩ người dùng nêu tên (FR-SCH-04)
+category: dat
 turns:
   - user: Tôi muốn khám da liễu với bác sĩ Thu Hà vào sáng thứ Hai tuần sau
     expect:

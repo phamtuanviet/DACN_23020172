@@ -1,4 +1,5 @@
 title: Chọn khung rồi xác nhận trên thẻ, lịch giống hệt đặt trên web (AC-12)
+category: dat
 turns:
   - user: Tôi muốn khám da liễu sáng thứ Bảy tuần sau
     expect:

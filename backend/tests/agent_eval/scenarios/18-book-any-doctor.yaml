@@ -1,0 +1,10 @@
+title: '"Bác sĩ nào cũng được" thì tìm khung của mọi bác sĩ, không lọc theo bác sĩ (FR-SCH-04)'
+category: dat
+turns:
+  - user: Tôi muốn khám da liễu sáng thứ Hai tuần sau, bác sĩ nào cũng được
+    expect:
+      tools: [find_available_slots]
+      args:  # doctor_id: null nghĩa là lần gọi không lọc bác sĩ
+        find_available_slots: {service_id: "@derm", date_from: "2026-10-12", date_to: "2026-10-12", part_of_day: morning, doctor_id: null}
+      no_tools: [propose_booking]
+      reply_any: ["12/10"]

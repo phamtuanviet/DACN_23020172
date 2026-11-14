@@ -1,0 +1,7 @@
+title: Bác sĩ được nêu không làm dịch vụ đó thì nói rõ, gợi ý bác sĩ đúng chuyên khoa (FR-CAT-03)
+category: dat
+turns:
+  - user: Tôi muốn khám tai mũi họng với bác sĩ Trần Minh sáng thứ Hai tuần sau
+    expect:
+      no_tools: [propose_booking]
+      reply_any: ["Lê Anh Tuấn", "Anh Tuấn", "không thực hiện", "không khám"]

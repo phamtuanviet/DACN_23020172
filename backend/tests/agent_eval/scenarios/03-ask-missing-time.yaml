@@ -1,4 +1,5 @@
 title: Thiếu thời gian thì hỏi lại, không tạo đề xuất (UC09 bước 3)
+category: dat
 turns:
   - user: Tôi muốn đặt lịch khám da liễu
     expect:

@@ -1,0 +1,8 @@
+title: Không có lịch sắp tới thì nói rõ, không tạo đề xuất hủy (UC10)
+category: huy
+turns:
+  - user: Hủy lịch hẹn của tôi giúp nhé
+    expect:
+      tools: [get_my_appointments]
+      no_proposal: true
+      reply_any: ["không có", "chưa có"]

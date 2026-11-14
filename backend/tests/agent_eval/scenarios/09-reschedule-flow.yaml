@@ -1,4 +1,5 @@
 title: Đổi lịch sang giờ khác cùng ngày, giữ mã lịch (UC10)
+category: doi
 appointments:
   - {key: lan_mon, patient: lan, doctor: derm_minh, service: derm, start: "2026-10-12T08:00:00+07:00"}
 turns:

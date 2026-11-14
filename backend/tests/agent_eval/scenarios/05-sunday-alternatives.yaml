@@ -1,4 +1,5 @@
 title: Ngày đã kín (Chủ nhật nghỉ) thì đưa phương án gần nhất (AC-11, FR-AGT-05)
+category: het-khung
 turns:
   - user: Tôi muốn khám da liễu sáng Chủ nhật tuần sau
     expect:

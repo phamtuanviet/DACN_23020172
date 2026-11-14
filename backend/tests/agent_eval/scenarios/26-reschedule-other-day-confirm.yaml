@@ -1,0 +1,16 @@
+title: Dời lịch sang ngày khác, chọn giờ rồi xác nhận; mã lịch giữ nguyên (UC10, AC-12)
+category: doi
+appointments:
+  - {key: lan_mon, patient: lan, doctor: derm_minh, service: derm, start: "2026-10-12T08:00:00+07:00"}
+turns:
+  - user: Tôi muốn dời lịch khám da liễu thứ Hai tuần sau sang sáng thứ Tư tuần sau
+    expect:
+      tools: [get_my_appointments, find_available_slots]
+      args:
+        find_available_slots: {service_id: "@derm", date_from: "2026-10-14"}
+  - user: Chọn 9 giờ sáng thứ Tư giúp tôi
+    expect:
+      proposal: {type: RESCHEDULE, appointment_id: "@lan_mon", start_at: "2026-10-14T09:00:00+07:00"}
+      reply_none: ["đã đổi lịch thành công", "đổi lịch thành công"]
+  - confirm: true
+    expect_appointment: {id: "@lan_mon", start_at: "2026-10-14T09:00:00+07:00", status: BOOKED}

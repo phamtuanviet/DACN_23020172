@@ -8,7 +8,8 @@ FastAPI, modular monolith (docs mục 4). Python 3.12, quản lý gói bằng `u
 app/
 ├── main.py          create_app(): điểm vào duy nhất của HTTP
 ├── worker.py        tiến trình tác vụ nền (APScheduler)
-├── cli.py           lệnh quản trị: export-openapi, seed, seed-appointments, create-admin, import-catalog
+├── cli.py           lệnh quản trị: export-openapi, seed, seed-appointments, seed-reviews, create-admin,
+│                    import-catalog
 ├── api/             router gốc /api/v1 và health check — chỉ ghép router, không có nghiệp vụ
 ├── core/            dùng chung: config, db, errors, logging, clock, security…
 ├── db/              Base, enum, model ORM (models/), seed
@@ -36,6 +37,8 @@ uv sync                                   # cài thư viện (kể cả nhóm de
 uv run pytest                             # unit + API test (bỏ qua integration, agent_eval)
 uv run pytest -m integration              # cần PostgreSQL: docker compose up -d db valkey
 uv run pytest -m agent_eval               # kịch bản Agent với LLM thật, tốn phí: tests/agent_eval/README.md
+uv run python -m tests.agent_eval.compare results/a.json results/b.json   # so sánh hai mô hình
+uv run python -m tests.perf.read_api --users 20 --duration 300  # đo API đọc (NFR-01, 02), cần dữ liệu seed
 uv run ruff check . && uv run mypy app    # lint, kiểm tra kiểu
 uv run alembic revision --autogenerate -m "mo ta"   # đọc lại file sinh ra trước khi commit
 uv run python -m app.cli --help

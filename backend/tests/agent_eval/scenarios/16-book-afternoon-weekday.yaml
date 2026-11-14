@@ -1,0 +1,10 @@
+title: Khám tai mũi họng chiều thứ Tư tuần sau → 14/10, buổi chiều (FR-AGT-03)
+category: dat
+turns:
+  - user: Tôi muốn khám tai mũi họng chiều thứ Tư tuần sau
+    expect:
+      tools: [find_available_slots]
+      args:
+        find_available_slots: {service_id: "@ent", date_from: "2026-10-14", date_to: "2026-10-14", part_of_day: afternoon}
+      no_tools: [propose_booking]
+      reply_any: ["14/10"]

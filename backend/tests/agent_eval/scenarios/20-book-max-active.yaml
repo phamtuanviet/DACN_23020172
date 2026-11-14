@@ -1,0 +1,15 @@
+title: Đã có 3 lịch chờ khám thì không tạo được đề xuất mới, giải thích quy định (BR-09)
+category: dat
+appointments:
+  - {key: lan_a, patient: lan, doctor: derm_minh, service: derm, start: "2026-10-12T08:00:00+07:00"}
+  - {key: lan_b, patient: lan, doctor: ent_tuan, service: ent, start: "2026-10-13T08:00:00+07:00", minutes: 15}
+  - {key: lan_c, patient: lan, doctor: internal_nam, service: internal, start: "2026-10-14T08:00:00+07:00"}
+turns:
+  - user: Tôi muốn đặt thêm lịch khám tai mũi họng sáng thứ Năm tuần sau
+    expect:
+      no_proposal: true
+  - user: Đặt khung 9 giờ giúp tôi
+    expect:
+      no_proposal: true
+      reply_any: ["3 lịch", "tối đa"]
+      reply_none: ["đã đặt lịch thành công", "đặt lịch thành công"]

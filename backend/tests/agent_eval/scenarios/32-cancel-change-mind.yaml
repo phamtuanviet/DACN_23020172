@@ -1,0 +1,12 @@
+title: Đã có thẻ hủy nhưng người dùng đổi ý thì không tạo thêm đề xuất, không báo đã hủy (BR-06)
+category: huy
+appointments:
+  - {key: lan_mon, patient: lan, doctor: derm_minh, service: derm, start: "2026-10-12T08:00:00+07:00"}
+turns:
+  - user: Hủy lịch khám da liễu thứ Hai tuần sau giúp tôi
+    expect:
+      proposal: {type: CANCEL, appointment_id: "@lan_mon"}
+  - user: Thôi, tôi đổi ý rồi, giữ lịch đó nhé
+    expect:
+      no_tools: [propose_booking]
+      reply_none: ["đã hủy"]

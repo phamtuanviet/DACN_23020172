@@ -1,0 +1,13 @@
+title: Hai lịch sắp tới, người dùng nêu tên bác sĩ thì hủy đúng lịch đó (UC10)
+category: huy
+appointments:
+  - {key: lan_mon, patient: lan, doctor: derm_minh, service: derm, start: "2026-10-12T08:00:00+07:00"}
+  - {key: lan_thu, patient: lan, doctor: derm_ha, service: derm, start: "2026-10-15T09:00:00+07:00"}
+turns:
+  - user: Hủy giúp tôi lịch khám với bác sĩ Thu Hà, tuần sau tôi bận
+    expect:
+      tools: [get_my_appointments, propose_booking]
+      proposal: {type: CANCEL, appointment_id: "@lan_thu"}
+      reply_none: ["đã hủy lịch thành công", "hủy lịch thành công"]
+  - confirm: true
+    expect_appointment: {id: "@lan_thu", status: CANCELLED}

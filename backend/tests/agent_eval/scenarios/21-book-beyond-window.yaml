@@ -1,0 +1,7 @@
+title: Ngày ngoài 30 ngày tới thì nói rõ quy định, không tạo đề xuất (BR-07)
+category: dat
+turns:
+  - user: Tôi muốn đặt lịch khám da liễu sáng ngày 20/12/2026
+    expect:
+      no_proposal: true
+      reply_any: ["30 ngày"]

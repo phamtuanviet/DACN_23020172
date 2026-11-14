@@ -1,0 +1,19 @@
+title: Bác sĩ được chọn kín lịch thì gợi ý bác sĩ khác cùng chuyên khoa hoặc ngày khác (FR-SCH-04, AC-11)
+category: het-khung
+# BS.CKI Nguyễn Thu Hà đã kín cả sáng Thứ Hai 12/10; ThS. BS. Trần Minh còn trống.
+appointments:
+  - {key: o1, patient: other, doctor: derm_ha, service: derm, start: "2026-10-12T08:00:00+07:00", minutes: 30}
+  - {key: o2, patient: other, doctor: derm_ha, service: derm, start: "2026-10-12T08:30:00+07:00", minutes: 30}
+  - {key: o3, patient: other, doctor: derm_ha, service: derm, start: "2026-10-12T09:00:00+07:00", minutes: 30}
+  - {key: o4, patient: other, doctor: derm_ha, service: derm, start: "2026-10-12T09:30:00+07:00", minutes: 30}
+  - {key: o5, patient: other, doctor: derm_ha, service: derm, start: "2026-10-12T10:00:00+07:00", minutes: 30}
+  - {key: o6, patient: other, doctor: derm_ha, service: derm, start: "2026-10-12T10:30:00+07:00", minutes: 30}
+  - {key: o7, patient: other, doctor: derm_ha, service: derm, start: "2026-10-12T11:00:00+07:00", minutes: 30}
+turns:
+  - user: Tôi muốn khám da liễu với bác sĩ Thu Hà sáng thứ Hai tuần sau
+    expect:
+      tools: [find_available_slots]
+      args:
+        find_available_slots: {doctor_id: "@derm_ha", date_from: "2026-10-12"}
+      no_tools: [propose_booking]
+      reply_any: ["Trần Minh", "13/10", "thứ ba", "chiều"]

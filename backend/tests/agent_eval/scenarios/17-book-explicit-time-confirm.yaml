@@ -1,0 +1,16 @@
+title: Nêu rõ giờ, đồng ý rồi xác nhận; lịch kênh AGENT đúng khung đã chọn (UC09, AC-12)
+category: dat
+turns:
+  - user: Tôi muốn khám nội tổng quát lúc 9 giờ sáng thứ Ba tuần sau, tôi bị ho kéo dài
+    expect:
+      tools: [find_available_slots]
+      args:
+        find_available_slots: {service_id: "@internal", date_from: "2026-10-13"}
+      reply_any: ["13/10"]
+      reply_none: ["đã đặt lịch thành công", "đặt lịch thành công"]
+  - user: Đúng rồi, đặt khung 9 giờ đó giúp tôi
+    expect:
+      proposal: {type: BOOK, service_id: "@internal", doctor_id: "@internal_nam", start_at: "2026-10-13T09:00:00+07:00"}
+      reply_none: ["đã đặt lịch thành công", "đặt lịch thành công"]
+  - confirm: true
+    expect_appointment: {start_at: "2026-10-13T09:00:00+07:00", channel: AGENT, status: BOOKED}
