@@ -25,7 +25,7 @@ Mười mục tiêu dưới đây chi phối gần như mọi lựa chọn trong
 
 ## 2. Kiến trúc tổng thể
 
-Hệ thống là một modular monolith đóng gói bằng container. Ở production, Cloudflare đứng trước; Caddy nhận HTTPS và chia tải cho 2 replica frontend Next.js và 2 replica backend FastAPI; một tiến trình worker chạy tác vụ nền; Valkey giữ bộ đếm giới hạn tốc độ; PostgreSQL 16 là dịch vụ managed có sao lưu tự động. LLM, email (Amazon SES) và giám sát (Sentry, Grafana Cloud) là dịch vụ bên ngoài.
+Hệ thống là một modular monolith đóng gói bằng container. Ở production, Cloudflare đứng trước; Caddy nhận HTTPS và chia tải cho 2 replica frontend Next.js và 2 replica backend FastAPI; một tiến trình worker chạy tác vụ nền; Valkey giữ bộ đếm giới hạn tốc độ; PostgreSQL 16 là dịch vụ managed có sao lưu tự động. LLM, email (Gmail SMTP) và giám sát (Sentry, Grafana Cloud) là dịch vụ bên ngoài.
 
 ### 2.1 Sơ đồ triển khai production
 
@@ -44,7 +44,7 @@ flowchart TB
     API -- "HTTPS" --> LLM["Dịch vụ LLM"]
     API --> PG[("PostgreSQL 16 managed<br/>backup tự động + PITR")]
     WK --> PG
-    WK -- "SMTP + TLS" --> SES["Amazon SES"]
+    WK -- "SMTP + TLS" --> SES["Gmail SMTP"]
     AL --> OBS["Sentry · Grafana Cloud"]
     LLM ~~~ PG ~~~ SES ~~~ OBS
 ```
@@ -149,7 +149,7 @@ Mỗi quyết định có mã TD để tham chiếu. Tiêu chí chung: công ngh
 | TD-25 | Máy chủ và điều phối | Docker Compose trên VM Linux (Ubuntu 24.04 LTS); 2 replica backend; deploy cuốn chiếu bằng script | Kubernetes; PaaS (Cloud Run, Render, Fly.io) | Một phòng khám chỉ vài trăm lịch mỗi ngày, một VM 2 vCPU dư sức; Kubernetes quá nặng cho một người vận hành. Chọn được nhà cung cấp trong nước nếu cần lưu dữ liệu tại Việt Nam. Ứng dụng không giữ trạng thái nên chuyển sang PaaS hay Kubernetes sau này không phải sửa code |
 | TD-26 | Reverse proxy | Caddy 2 | Nginx + Certbot; Traefik | Cấu hình ngắn; HTTPS sẵn (tự xin chứng chỉ hoặc dùng chứng chỉ Origin của Cloudflare); tự flush luồng SSE; health check chủ động để bỏ qua replica đang khởi động lại khi deploy |
 | TD-27 | Bảo vệ biên, CDN | Cloudflare (gói miễn phí): DNS, cache file tĩnh, chống DDoS, WAF cơ bản | Không dùng CDN | Che IP máy chủ, chặn lưu lượng xấu trước khi tới VM, phục vụ file tĩnh gần người dùng; SSE đi qua được nhờ nhịp `: ping` định kỳ |
-| TD-28 | Email | Amazon SES qua SMTP; tên miền xác thực SPF, DKIM, DMARC | Mailpit (bản 1.0, chỉ demo); Gmail SMTP; SendGrid | Gửi thật tới bệnh nhân với tỷ lệ vào hộp thư cao, chi phí thấp; giữ giao diện SMTP như SRS 7.4 nên đổi nhà cung cấp chỉ bằng cấu hình. Gmail SMTP giới hạn số email/ngày và không dành cho email giao dịch |
+| TD-28 | Email | Gmail SMTP (`smtp.gmail.com:587`, STARTTLS) với mật khẩu ứng dụng; `MAIL_FROM` để trống thì gửi từ chính tài khoản SMTP | Amazon SES (thiết kế trước ngày 15/11/2026); Mailpit (bản 1.0, chỉ demo); SendGrid | Gửi thật tới bệnh nhân mà không cần hạ tầng AWS hay xác thực tên miền, miễn phí; đủ cho quy mô đồ án (Gmail giới hạn khoảng 500 email/ngày, người gửi là địa chỉ Gmail). Giữ giao diện SMTP như SRS 7.4 nên đổi sang SES hay nhà cung cấp khác chỉ bằng cấu hình |
 | TD-29 | Secret | GitHub Environments lưu secret; lúc deploy ghi thành file Docker secret, ứng dụng đọc qua `secrets_dir` của pydantic-settings | File `.env` chép tay lên máy chủ (bản 1.0) | Secret không nằm trong repo, image hay lịch sử shell; đổi secret bằng một lần deploy, có nhật ký ai đổi lúc nào |
 | TD-30 | CI/CD | GitHub Actions: test → build image → quét Trivy → đẩy GHCR → deploy staging → smoke test → duyệt tay → deploy production | Deploy thủ công qua SSH | Mỗi bản phát hành gắn tag theo commit; rollback bằng cách deploy lại tag cũ; không ai phải gõ lệnh tay trên máy chủ production |
 | TD-31 | Quản lý gói | `uv` + `uv.lock` (backend); `npm` + `package-lock.json` (frontend) | pip + requirements.txt; Poetry | Cài nhanh; file khóa phiên bản bảo đảm image build ở CI giống hệt máy phát triển |
@@ -1183,7 +1183,7 @@ sequenceDiagram
     participant SV as AppointmentService
     participant DB as PostgreSQL
     participant W as worker
-    participant SES as Amazon SES (SMTP)
+    participant SES as Gmail SMTP
     SV->>DB: Một transaction: ghi lịch hẹn + INSERT notifications (PENDING)
     loop Mỗi 30 giây, tối đa 20 email
         W->>DB: Lấy 1 dòng đến hạn bằng FOR UPDATE SKIP LOCKED
@@ -1198,7 +1198,7 @@ sequenceDiagram
 
 | Job của worker | Chu kỳ | Việc làm |
 | --- | --- | --- |
-| `send_notifications` | 30 giây | Như sơ đồ trên; mỗi email một transaction ngắn. Gửi tối đa 4 lần (lần đầu + 3 lần thử lại cách nhau 1, 5, 15 phút), sau đó chuyển `FAILED` và ghi log lỗi `notification.failed`; Grafana cảnh báo từ log này qua Loki (mục 11.7) (FR-NTF-03). Nội dung dựng từ mẫu Jinja2 (`notifications/templates`, bản HTML và bản chữ thuần) cho 4 loại email (SRS 7.4, thiết kế S-email), gửi bằng `aiosmtplib` tới SMTP của Amazon SES (cổng 587, STARTTLS) |
+| `send_notifications` | 30 giây | Như sơ đồ trên; mỗi email một transaction ngắn. Gửi tối đa 4 lần (lần đầu + 3 lần thử lại cách nhau 1, 5, 15 phút), sau đó chuyển `FAILED` và ghi log lỗi `notification.failed`; Grafana cảnh báo từ log này qua Loki (mục 11.7) (FR-NTF-03). Nội dung dựng từ mẫu Jinja2 (`notifications/templates`, bản HTML và bản chữ thuần) cho 4 loại email (SRS 7.4, thiết kế S-email), gửi bằng `aiosmtplib` tới Gmail SMTP (cổng 587, STARTTLS, mật khẩu ứng dụng) |
 | `enqueue_reminders` | 5 phút | Thêm email `REMINDER` cho lịch BOOKED bắt đầu trong 24 giờ tới và được tạo sớm hơn 24 giờ trước giờ khám; `ON CONFLICT DO NOTHING` dựa trên unique index một-nhắc-mỗi-lịch (FR-NTF-02) |
 | `expire_proposals` | 1 phút | Chuyển đề xuất PENDING đã quá `expires_at` sang EXPIRED |
 | `purge_expired` | Hằng ngày 03:00 | Xóa refresh token hết hạn quá 30 ngày và hội thoại quá `CHAT_RETENTION_DAYS` ngày (mục 7.7) |
@@ -1256,7 +1256,7 @@ Production chạy trên một máy chủ ứng dụng bằng Docker Compose, đ�
 | --- | --- | --- | --- |
 | dev | `compose.yaml` trên máy lập trình: PostgreSQL, Valkey, Mailpit chạy bằng container | Seed giả | Lập trình, chấm bài (AC-20) |
 | staging | VM nhỏ (1–2 vCPU, 2 GB RAM) + PostgreSQL managed gói nhỏ; cấu hình `compose.prod.yaml` giống hệt production; email gửi tới hộp thư thử | Seed giả | Kiểm tra bản phát hành, chạy bộ kịch bản Agent, chạy k6, diễn tập khôi phục |
-| production | VM 2 vCPU, 4 GB RAM, Ubuntu 24.04 LTS + PostgreSQL 16 managed có PITR + Cloudflare + Amazon SES | Dữ liệu thật | Phục vụ phòng khám |
+| production | VM 2 vCPU, 4 GB RAM, Ubuntu 24.04 LTS + PostgreSQL 16 managed có PITR + Cloudflare + Gmail SMTP | Dữ liệu thật | Phục vụ phòng khám |
 
 **Ước lượng tải.** 20 bác sĩ, mỗi người tối đa khoảng 30 lịch/ngày, tức chừng 600 lịch/ngày và vài chục người dùng đồng thời giờ cao điểm. Ước tính 2 replica backend (mỗi replica 2 worker Uvicorn), 2 replica frontend Next.js, worker, Valkey, Caddy và Alloy dùng khoảng 2–2,5 GB RAM, nên VM 2 vCPU/4 GB vẫn đủ; con số thật được đo bằng k6 trên staging trước go-live.
 
@@ -1467,14 +1467,14 @@ networks:
 
 | Loại | Gồm | Lưu ở |
 | --- | --- | --- |
-| Secret | `database_url` (role `app_runtime`, `sslmode=verify-full`), `database_migrator_url`, `jwt_keys` (khóa ký hiện tại + khóa cũ), `llm_api_key`, `smtp_user` và `smtp_password` (thông tin SMTP của SES), `valkey_url` và `valkey_conf` (sinh từ một secret `VALKEY_PASSWORD`), `sentry_dsn`, `grafana_cloud_token`, chứng chỉ origin | GitHub Environments (`staging`, `production`) → file trong `/etc/dacn/secrets/`, chỉ root và user chạy container đọc được; danh sách ở `deploy/secrets.conf` |
+| Secret | `database_url` (role `app_runtime`, `sslmode=verify-full`), `database_migrator_url`, `jwt_keys` (khóa ký hiện tại + khóa cũ), `llm_api_key`, `smtp_user` và `smtp_password` (tài khoản Gmail và mật khẩu ứng dụng), `valkey_url` và `valkey_conf` (sinh từ một secret `VALKEY_PASSWORD`), `sentry_dsn`, `grafana_cloud_token`, chứng chỉ origin | GitHub Environments (`staging`, `production`) → file trong `/etc/dacn/secrets/`, chỉ root và user chạy container đọc được; danh sách ở `deploy/secrets.conf` |
 | Cấu hình | `CLINIC_TZ`, `CLINIC_PHONE`; tham số nghiệp vụ `BOOKING_WINDOW_DAYS=30`, `CHANGE_DEADLINE_HOURS=2`, `MAX_ACTIVE_APPOINTMENTS=3`, `PROPOSAL_TTL_MIN=10`, `AGENT_DAILY_MESSAGE_LIMIT=50`, `REMINDER_HOURS_BEFORE=24`; `LLM_PROVIDER`, `LLM_MODEL`, `LLM_FALLBACK_MODEL`, `LLM_TIMEOUT_S=30`, `LLM_DAILY_BUDGET_USD`; `SMTP_HOST`, `SMTP_PORT=587`, `MAIL_FROM`; `CHAT_RETENTION_DAYS=365` | `deploy/env/<môi trường>/app.env` trong repo, sửa qua pull request → `/etc/dacn/app.env` |
 | Suy ra | `APP_ENV` theo tên môi trường của workflow; `PUBLIC_BASE_URL` = `https://` + `SITE_DOMAIN` (`deploy.env`, nơi duy nhất khai báo tên miền) | `compose.prod.yaml` truyền xuống mọi service |
 
 - Secret không bao giờ nằm trong repo, image, tham số dòng lệnh hay log; gitleaks trên CI chặn commit lộ khóa (NFR-05). `.env.example` chỉ dùng cho dev.
 - Thứ tự ưu tiên khi trùng tên: file secret → biến môi trường → giá trị mặc định, nên dòng trùng tên trong `deploy/env/*.env` không đè được secret. CI (`deploy/secrets.sh lint`) chặn tên secret và giá trị suy ra xuất hiện trong `deploy/env/`, và đối chiếu `deploy/secrets.conf` với mục `secrets` của `compose.prod.yaml`.
 - Workflow deploy kiểm tra đủ secret và variable theo `deploy/secrets.conf` trước khi chạm vào máy chủ; thiếu hoặc sai định dạng thì dừng và nêu tên từng key. Người vận hành nhập và đổi giá trị bằng `make secrets`, `make secret` (gọi GitHub CLI), không cần chép giá trị ra máy cá nhân.
-- Xoay secret: JWT thêm khóa mới làm khóa ký và giữ khóa cũ để xác minh thêm 30 phút; mật khẩu database, khóa LLM, thông tin SES thì tạo giá trị mới → cập nhật GitHub Environments (`make secret`) → deploy → thu hồi giá trị cũ. `deploy.sh` gắn mã băm các file secret của mỗi service vào label, nên lần deploy đó chỉ tạo lại những container dùng secret đã đổi (kể cả khi deploy lại cùng bản phát hành).
+- Xoay secret: JWT thêm khóa mới làm khóa ký và giữ khóa cũ để xác minh thêm 30 phút; mật khẩu database, khóa LLM, mật khẩu ứng dụng Gmail thì tạo giá trị mới → cập nhật GitHub Environments (`make secret`) → deploy → thu hồi giá trị cũ. `deploy.sh` gắn mã băm các file secret của mỗi service vào label, nên lần deploy đó chỉ tạo lại những container dùng secret đã đổi (kể cả khi deploy lại cùng bản phát hành).
 
 ### 11.5 CI/CD và quy trình phát hành
 
@@ -1556,7 +1556,7 @@ Danh sách trên là đáp ứng về mặt kỹ thuật; nghĩa vụ pháp lý 
 ### 11.9 Danh sách kiểm tra trước go-live
 
 - [ ] Tên miền, DNS trên Cloudflare, chế độ SSL "Full (strict)", chứng chỉ origin đã cài.
-- [ ] Amazon SES: tên miền đã xác thực SPF, DKIM, DMARC; tài khoản đã ra khỏi chế độ sandbox.
+- [ ] Gmail SMTP: tài khoản bật xác minh 2 bước, mật khẩu ứng dụng đặt vào `SMTP_PASSWORD`; đã gửi thử một email đặt lịch.
 - [ ] PostgreSQL managed: PITR bật, extension `btree_gist` và `unaccent` có sẵn, hai role `app_migrator` và `app_runtime`, chỉ truy cập qua mạng riêng.
 - [ ] Toàn bộ secret nằm trong GitHub Environments; không còn secret nào trên máy cá nhân hay trong repo.
 - [ ] `make secrets-status env=production` báo đủ giá trị bắt buộc; environment `production` có người duyệt và chỉ deploy từ `main`.
@@ -1650,7 +1650,7 @@ Bảng này bổ sung cho bảng rủi ro ở PRD mục 10, chỉ gồm các r�
 | VM ứng dụng là điểm lỗi đơn | Gián đoạn tới khi dựng lại | Database managed nằm tách riêng nên không mất dữ liệu; dựng VM mới bằng script và deploy lại tag hiện tại trong RTO 2 giờ; khi cần khả dụng cao hơn thì thêm VM thứ hai sau load balancer |
 | SSE bị Cloudflare hoặc proxy cắt | Chat bị ngắt giữa chừng | Nhịp `: ping` 15 giây; Caddy tự flush; smoke test chat chạy qua đúng đường Cloudflare → Caddy |
 | Lỗi múi giờ, nhất là quanh nửa đêm | Hiện sai khung, đếm sai hạn mức trong ngày | Lưu `timestamptz`, chỉ đổi múi giờ ở biên; test với đồng hồ cố định lúc 23:59 và 00:01 |
-| Email vào thư rác hoặc bị giới hạn | Bệnh nhân không nhận xác nhận, nhắc lịch | Xác thực SPF/DKIM/DMARC, xin ra khỏi sandbox SES sớm, theo dõi email FAILED |
+| Email vào thư rác hoặc bị giới hạn | Bệnh nhân không nhận xác nhận, nhắc lịch | Theo dõi email FAILED; vượt giới hạn Gmail (khoảng 500 email/ngày) thì chuyển sang SES hoặc SendGrid chỉ bằng cấu hình (TD-28) |
 | Migration lỗi giữa chừng khi deploy | Bản mới không lên được | Migrate chạy trước khi thay replica, lỗi thì dừng và bản cũ vẫn chạy; expand/contract; thử trên staging trước |
 | Vi phạm quy định về dữ liệu cá nhân | Rủi ro pháp lý cho phòng khám | Thiết kế ở mục 11.8; rà soát pháp lý trước go-live |
 | Một người vận hành, có lúc vắng mặt | Sự cố không ai xử lý kịp | Cảnh báo tự động, runbook, ưu tiên dịch vụ managed để giảm việc vận hành |

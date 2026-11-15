@@ -86,3 +86,20 @@ def test_llm_key_is_read_only_from_llm_api_key(monkeypatch: pytest.MonkeyPatch) 
     (compose ánh xạ OPENAI_API_KEY sang LLM_API_KEY cho máy dev)."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-khac")
     assert Settings(_env_file=None).llm_api_key is None
+
+
+def test_blank_mail_from_sends_from_smtp_user() -> None:
+    """MAIL_FROM để trống (Gmail SMTP) thì người gửi là chính tài khoản SMTP."""
+    settings = Settings(
+        _env_file=None, **VALID_STAGING, mail_from="", smtp_user="phongkham@example.com"
+    )
+    settings.validate_for_runtime()
+    assert settings.sender_address == "phongkham@example.com"
+    explicit = Settings(_env_file=None, mail_from="no-reply@example.com", smtp_user="u@example.com")
+    assert explicit.sender_address == "no-reply@example.com"
+
+
+def test_staging_needs_a_sender_address() -> None:
+    settings = Settings(_env_file=None, **VALID_STAGING, mail_from="")
+    with pytest.raises(RuntimeError, match="mail_from"):
+        settings.validate_for_runtime()

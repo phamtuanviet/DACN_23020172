@@ -86,7 +86,9 @@ class Settings(BaseSettings):
     smtp_password: SecretStr | None = None
     smtp_starttls: bool = False
     smtp_timeout_s: int = 15
-    mail_from: str = "no-reply@dacn.local"
+    # Bỏ trống thì gửi từ chính smtp_user: Gmail SMTP bắt người gửi trùng tài khoản đăng nhập,
+    # và địa chỉ đó chỉ nằm trong secret, không lộ trong deploy/env/*.env của repo công khai.
+    mail_from: str | None = "no-reply@dacn.local"
 
     # --- Quan sát ---
     sentry_dsn: SecretStr | None = None
@@ -98,6 +100,7 @@ class Settings(BaseSettings):
         "llm_api_key",
         "smtp_user",
         "smtp_password",
+        "mail_from",
         "sentry_dsn",
         mode="before",
     )
@@ -144,6 +147,11 @@ class Settings(BaseSettings):
         url = self.database_migrator_url or self.database_url
         return url.get_secret_value()
 
+    @property
+    def sender_address(self) -> str:
+        """Địa chỉ người gửi email: MAIL_FROM, bỏ trống thì dùng tài khoản SMTP."""
+        return self.mail_from or self.smtp_user or "no-reply@dacn.local"
+
     def validate_for_runtime(self) -> None:
         """Gọi khi backend/worker khởi động. Staging và production từ chối chạy với cấu hình dev."""
         if self.is_development:
@@ -168,6 +176,8 @@ class Settings(BaseSettings):
             problems.append("public_base_url phải dùng https")
         if not self.smtp_starttls:
             problems.append("smtp_starttls phải bật")
+        if self.mail_from is None and self.smtp_user is None:
+            problems.append("thiếu mail_from (hoặc smtp_user để gửi từ chính tài khoản SMTP)")
         if self.is_production and self.sentry_dsn is None:
             problems.append("thiếu sentry_dsn")
         if self.llm_provider is LlmProvider.FAKE:

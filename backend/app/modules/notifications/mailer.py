@@ -56,18 +56,20 @@ class SmtpMailer:
     async def send(self, email: OutgoingEmail) -> None:
         settings = self._settings
         message = EmailMessage()
-        message["From"] = formataddr((settings.clinic_name, settings.mail_from))
+        message["From"] = formataddr((settings.clinic_name, settings.sender_address))
         message["To"] = email.to
         message["Subject"] = email.subject
         message["Date"] = formatdate(localtime=True)
-        message["Message-ID"] = make_msgid(domain=settings.mail_from.rpartition("@")[2] or None)
+        message["Message-ID"] = make_msgid(
+            domain=settings.sender_address.rpartition("@")[2] or None
+        )
         message.set_content(email.text)
         message.add_alternative(email.html, subtype="html")
         password = settings.smtp_password.get_secret_value() if settings.smtp_password else None
         # Phong bì ghi rõ người gửi, người nhận, không để aiosmtplib rút từ header To.
         await aiosmtplib.send(
             message,
-            sender=settings.mail_from,
+            sender=settings.sender_address,
             recipients=[email.to],
             hostname=settings.smtp_host,
             port=settings.smtp_port,

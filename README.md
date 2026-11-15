@@ -24,7 +24,7 @@ Bệnh nhân đặt, đổi, hủy lịch khám qua website hoặc trò chuyện
 | Secret | Không cần (giá trị dev) | GitHub Environment `staging` | GitHub Environment `production` |
 | Database | PostgreSQL container | PostgreSQL managed (gói nhỏ) | PostgreSQL managed có PITR |
 | Dữ liệu | Dữ liệu giả (seed) | Dữ liệu giả (seed) | Dữ liệu thật, chặn seed |
-| Email | Mailpit — xem tại http://localhost:8025 | Amazon SES | Amazon SES |
+| Email | Mailpit — xem tại http://localhost:8025 | Gmail SMTP | Gmail SMTP |
 | Swagger `/docs` | Bật | Bật | Tắt |
 | Công cụ tìm kiếm | Chặn | Chặn | Cho phép trang công khai |
 | Deploy | — | Tự động khi CI trên `main` xanh | Sau staging, cần người duyệt |
