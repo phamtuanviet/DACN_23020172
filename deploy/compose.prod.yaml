@@ -25,7 +25,7 @@ x-app: &app
 x-api: &api
   <<: *app
   # Chỉ Caddy gọi được backend (mạng nội bộ) nên tin header X-Forwarded-* trong mạng này.
-  command: uvicorn --factory app.main:create_app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips "*" --timeout-graceful-shutdown 40
+  command: uvicorn --factory app.main:create_app --host 0.0.0.0 --port 8000 --workers ${API_WORKERS:-2} --proxy-headers --forwarded-allow-ips "*" --timeout-graceful-shutdown 40
   healthcheck: { test: [ "CMD", "python", "-m", "app.healthcheck" ], interval: 10s, retries: 3, start_period: 20s }
   stop_grace_period: 45s
 
@@ -76,6 +76,24 @@ services:
     restart: "no"
     profiles: [ migrate ]
 
+  # PostgreSQL trong container cho môi trường không dùng database managed (staging), bật bằng
+  # COMPOSE_PROFILES=db trong deploy.env. deploy.sh khởi động nó trước bước migrate và đồng bộ role,
+  # database theo hai secret DATABASE_MIGRATOR_URL, DATABASE_URL (db/roles.sh). Mật khẩu superuser
+  # sinh ngẫu nhiên lúc khởi tạo và không lưu ở đâu: superuser không đăng nhập được qua mạng,
+  # quản trị qua socket trong container (docker compose exec db psql -U postgres).
+  db:
+    image: postgres:16.15
+    profiles: [ db ]
+    entrypoint: [ "sh", "-c", "export POSTGRES_PASSWORD=$$(head -c 32 /dev/urandom | base64) && exec docker-entrypoint.sh postgres -c max_connections=50" ]
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./db:/opt/dacn-db:ro
+    healthcheck: { test: [ "CMD", "pg_isready", "-U", "postgres", "-d", "postgres" ], interval: 5s, retries: 12 }
+    stop_grace_period: 30s
+    restart: unless-stopped
+    logging: { driver: journald }
+    networks: [ internal ]
+
   valkey:
     image: valkey/valkey:8.1.10
     command: [ "valkey-server", "/run/secrets/valkey_conf" ]   # requirepass, maxmemory, không lưu xuống đĩa
@@ -116,6 +134,7 @@ secrets:   # file do workflow deploy ghi từ GitHub Environments; chủ sở h�
   origin_key:            { file: /etc/dacn/secrets/origin_key }
 
 volumes:
+  pg_data: {}
   next_static: {}
   caddy_data: {}
   alloy_data: {}

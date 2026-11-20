@@ -61,13 +61,26 @@ sudo mkdir -p /var/log/journal && sudo systemctl restart systemd-journald
 
 # Tự vá bảo mật hệ điều hành
 sudo apt-get install -y unattended-upgrades
+
+# Máy 2 GB RAM chạy cả database (staging): thêm 2 GB swap
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 ```
 
 Sau đó chạy `make secrets env=<môi trường>` trên máy bạn. Lệnh này tự tạo khóa SSH riêng cho CI, in lệnh cài khóa công khai vào user `deploy`, lấy `SSH_KNOWN_HOSTS` bằng `ssh-keyscan` (kèm vân tay để đối chiếu), tự sinh `JWT_KEYS` và `VALKEY_PASSWORD`. Khóa riêng chỉ nằm trong GitHub, không lưu lại trên máy bạn.
 
 **Tường lửa:** dùng firewall của nhà cung cấp cloud: 80/443 chỉ nhận từ [dải IP Cloudflare](https://www.cloudflare.com/ips/), 22 chỉ từ IP quản trị. Không dựa vào `ufw` cho 80/443 vì Docker tự mở cổng publish và bỏ qua luật của `ufw`.
 
-**Database managed** (chạy bằng tài khoản quản trị của nhà cung cấp):
+**Database trong container (staging).** `COMPOSE_PROFILES=db` trong `env/<môi trường>/deploy.env` bật service `db` (PostgreSQL 16) ngay trên máy chủ, dữ liệu nằm trong volume `dacn_pg_data`. Không cần tạo gì bằng tay: mỗi lần deploy, `deploy.sh` khởi động `db` rồi chạy `db/roles.sh`, tạo hoặc cập nhật role, database, extension và quyền theo đúng hai secret `DATABASE_MIGRATOR_URL`, `DATABASE_URL`. Hai URL trỏ tới `db:5432` với `sslmode=disable` (chỉ đi trong mạng nội bộ của Docker), mật khẩu chỉ gồm chữ, số, `-`, `_`:
+
+```text
+postgresql+psycopg://app_migrator:<mật khẩu>@db:5432/dacn?sslmode=disable
+postgresql+psycopg://app_runtime:<mật khẩu>@db:5432/dacn?sslmode=disable
+```
+
+Đổi mật khẩu: đổi secret rồi deploy lại. Không có sao lưu tự động: chỉ dùng cho môi trường có dữ liệu giả. Vào psql: `docker compose -f compose.prod.yaml exec db psql -U postgres dacn` (user `deploy`, thư mục `/opt/dacn`, đã nạp `deploy.env`).
+
+**Database managed** (production; chạy bằng tài khoản quản trị của nhà cung cấp; `COMPOSE_PROFILES` để trống):
 
 ```sql
 CREATE ROLE app_migrator LOGIN PASSWORD '...';

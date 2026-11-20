@@ -1255,7 +1255,7 @@ Production chạy trên một máy chủ ứng dụng bằng Docker Compose, đ�
 | Môi trường | Hạ tầng | Dữ liệu | Mục đích |
 | --- | --- | --- | --- |
 | dev | `compose.yaml` trên máy lập trình: PostgreSQL, Valkey, Mailpit chạy bằng container | Seed giả | Lập trình, chấm bài (AC-20) |
-| staging | VM nhỏ (1–2 vCPU, 2 GB RAM) + PostgreSQL managed gói nhỏ; cấu hình `compose.prod.yaml` giống hệt production; email gửi tới hộp thư thử | Seed giả | Kiểm tra bản phát hành, chạy bộ kịch bản Agent, chạy k6, diễn tập khôi phục |
+| staging | VM nhỏ (2 vCPU, 2 GB RAM + 2 GB swap; hiện là AWS EC2 `t3.small` ở Sydney); PostgreSQL 16 chạy trong container trên chính VM (service `db`, bật bằng `COMPOSE_PROFILES=db`, không sao lưu vì chỉ có seed giả) thay cho gói managed để giữ chi phí gần 0; cùng `compose.prod.yaml` với production, mỗi replica backend 1 worker Uvicorn (`API_WORKERS`); email gửi tới hộp thư thử | Seed giả | Kiểm tra bản phát hành, chạy bộ kịch bản Agent, chạy k6, diễn tập khôi phục |
 | production | VM 2 vCPU, 4 GB RAM, Ubuntu 24.04 LTS + PostgreSQL 16 managed có PITR + Cloudflare + Gmail SMTP | Dữ liệu thật | Phục vụ phòng khám |
 
 **Ước lượng tải.** 20 bác sĩ, mỗi người tối đa khoảng 30 lịch/ngày, tức chừng 600 lịch/ngày và vài chục người dùng đồng thời giờ cao điểm. Ước tính 2 replica backend (mỗi replica 2 worker Uvicorn), 2 replica frontend Next.js, worker, Valkey, Caddy và Alloy dùng khoảng 2–2,5 GB RAM, nên VM 2 vCPU/4 GB vẫn đủ; con số thật được đo bằng k6 trên staging trước go-live.

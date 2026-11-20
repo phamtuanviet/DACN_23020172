@@ -60,6 +60,15 @@ log "Bản phát hành $RELEASE lên $SITE_DOMAIN"
 log "Hạ tầng nền (chỉ tạo lại nếu cấu hình đổi)"
 "${COMPOSE[@]}" up -d valkey alloy caddy
 
+if [[ ,${COMPOSE_PROFILES:-}, == *,db,* ]]; then
+  log "PostgreSQL trong container: khởi động, đồng bộ role và database với secret"
+  "${COMPOSE[@]}" up -d db
+  wait_healthy db
+  # URL đi qua stdin, không nằm trên dòng lệnh (ps) hay trong biến môi trường của container.
+  { cat "$CONFIG_DIR/secrets/database_migrator_url"; echo; cat "$CONFIG_DIR/secrets/database_url"; echo; } \
+    | "${COMPOSE[@]}" exec -T db bash /opt/dacn-db/roles.sh
+fi
+
 log "Chép file tĩnh Next.js vào volume next_static"
 docker run --rm --user 0 --entrypoint sh \
   -v "${COMPOSE_PROJECT_NAME}_next_static:/target" \
@@ -68,7 +77,8 @@ docker run --rm --user 0 --entrypoint sh \
 
 if [[ $SKIP_MIGRATE != --skip-migrate ]]; then
   log "Migration (role app_migrator)"
-  "${COMPOSE[@]}" --profile migrate run --rm migrate
+  # Gộp với COMPOSE_PROFILES: cờ --profile trên dòng lệnh thay hẳn biến này.
+  COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}migrate" "${COMPOSE[@]}" run --rm migrate
 fi
 
 roll backend_a backend_b
