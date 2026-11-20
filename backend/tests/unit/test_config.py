@@ -83,7 +83,7 @@ def test_fake_llm_is_development_only(env: Environment) -> None:
 
 def test_llm_key_is_read_only_from_llm_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     """Không đọc OPENAI_API_KEY: khóa của nhà cung cấp này không được gửi sang nhà cung cấp khác
-    (compose ánh xạ OPENAI_API_KEY sang LLM_API_KEY cho máy dev)."""
+    (mặc định là DeepSeek)."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-khac")
     assert Settings(_env_file=None).llm_api_key is None
 

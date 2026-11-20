@@ -28,6 +28,7 @@ class Environment(StrEnum):
 
 
 class LlmProvider(StrEnum):
+    DEEPSEEK = "deepseek"  # API tương thích OpenAI, chạy chế độ không suy luận (agent/llm.py)
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     FAKE = "fake"  # mô hình giả theo luật, chỉ cho development và e2e (không gọi mạng)
@@ -68,16 +69,17 @@ class Settings(BaseSettings):
     chat_retention_days: int = 365
 
     # --- LLM (TD-21, docs mục 6.8) ---
-    llm_provider: LlmProvider = LlmProvider.OPENAI
-    llm_model: str = "gpt-4o-mini"
+    llm_provider: LlmProvider = LlmProvider.DEEPSEEK
+    llm_model: str = "deepseek-flash"  # DeepSeek-V4.1-Flash
     llm_fallback_model: str | None = None  # cùng nhà cung cấp, đã qua bộ kịch bản đánh giá
     llm_api_key: SecretStr | None = None
     llm_timeout_s: int = 30
     llm_daily_budget_usd: float = 5.0
-    # Đơn giá để quy token ra tiền cho trần chi phí ngày; mặc định là giá niêm yết của
-    # gpt-4o-mini (USD cho 1 triệu token). Đổi mô hình thì đổi theo bảng giá của nhà cung cấp.
-    llm_input_usd_per_mtok: float = 0.15
-    llm_output_usd_per_mtok: float = 0.60
+    # Đơn giá để quy token ra tiền cho trần chi phí ngày (USD cho 1 triệu token); mặc định là giá
+    # giờ cao điểm, không trúng cache của deepseek-flash (11/2026), nên trần không bị tính thiếu.
+    # Đổi mô hình thì đổi theo bảng giá của nhà cung cấp (gpt-4o-mini: 0.15 và 0.60).
+    llm_input_usd_per_mtok: float = 0.30
+    llm_output_usd_per_mtok: float = 1.20
 
     # --- Email (TD-28) ---
     smtp_host: str = "localhost"

@@ -1,6 +1,6 @@
 """Hạ tầng bộ kịch bản đánh giá Agent: database test của integration, LLM thật theo biến môi trường.
 
-Chạy: `uv run pytest -m agent_eval` (cần LLM_API_KEY hoặc OPENAI_API_KEY trong môi trường và
+Chạy: `uv run pytest -m agent_eval` (cần LLM_API_KEY trong môi trường và
 `docker compose up -d db valkey`). Mỗi lần chạy gọi LLM thật cho mọi kịch bản nên tốn phí.
 
 Cuối lần chạy in mục "Đánh giá Agent" (tỷ lệ đạt theo nhóm, thời gian, token, chi phí ước tính) và

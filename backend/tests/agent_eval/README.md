@@ -6,18 +6,18 @@ Sau mỗi lượt chat, bảng `appointments` phải giữ nguyên, vì chỉ b�
 
 ## Chạy
 
-Mỗi lần chạy gọi LLM thật cho mọi kịch bản nên tốn phí. Với gpt-4o-mini, cả bộ 41 kịch bản (khoảng 50 lượt chat, mỗi lượt 2–3 lần gọi LLM) ước khoảng 0,1 USD (ước tính từ độ dài prompt, chưa đo). Chỉ chạy khi đổi prompt, tool hoặc mô hình, hoặc trước mốc đánh giá.
+Mỗi lần chạy gọi LLM thật cho mọi kịch bản nên tốn phí. Với gpt-4o-mini (deepseek-flash giá cùng tầm), cả bộ 41 kịch bản (khoảng 50 lượt chat, mỗi lượt 2–3 lần gọi LLM) ước khoảng 0,1 USD (ước tính từ độ dài prompt, chưa đo). Chỉ chạy khi đổi prompt, tool hoặc mô hình, hoặc trước mốc đánh giá.
 
 ```bash
 docker compose up -d db valkey
 cd backend
-export LLM_API_KEY=...            # hoặc OPENAI_API_KEY; LLM_PROVIDER, LLM_MODEL tùy chọn
+export LLM_API_KEY=...            # khóa của nhà cung cấp trong LLM_PROVIDER (mặc định deepseek)
 uv run pytest -m agent_eval -v    # -k 08-cancel để chạy một kịch bản
 ```
 
 Cuối lần chạy có mục "Đánh giá Agent": mô hình, phiên bản prompt, số kịch bản đạt (tổng và theo nhóm), số vi phạm an toàn, thời gian token đầu và cả lượt (p50, p90), số token, chi phí ước tính, đạt hay chưa AC-15 (≥ 80%, 0 vi phạm) và NFR-03 (p90 token đầu < 5 s, cả lượt < 15 s), rồi từng kịch bản trượt kèm lý do. Kết quả chi tiết (từng kịch bản, từng lượt) ghi vào `results/<thời điểm>-<mô hình>.json` (thư mục không commit) hoặc vào đường dẫn trong `AGENT_EVAL_OUT`.
 
-Thời gian và token lấy từ log `agent.turn` mà service ghi cuối mỗi lượt, nên đo phía server: token đầu tính từ lúc bắt đầu chạy đồ thị. Chi phí tính theo `LLM_INPUT_USD_PER_MTOK`, `LLM_OUTPUT_USD_PER_MTOK` (mặc định giá gpt-4o-mini); đổi mô hình thì đặt lại hai biến này theo bảng giá của nhà cung cấp.
+Thời gian và token lấy từ log `agent.turn` mà service ghi cuối mỗi lượt, nên đo phía server: token đầu tính từ lúc bắt đầu chạy đồ thị. Chi phí tính theo `LLM_INPUT_USD_PER_MTOK`, `LLM_OUTPUT_USD_PER_MTOK` (mặc định giá giờ cao điểm của deepseek-flash); đổi mô hình thì đặt lại hai biến này theo bảng giá của nhà cung cấp.
 
 Chạy với `LLM_PROVIDER=fake` thì dùng mô hình giả theo luật. Chế độ này chỉ để kiểm tra bộ chạy, không tốn phí và kết quả không có giá trị đánh giá. Cấu trúc kịch bản (khóa, tên tool, tham số, tham chiếu `@khóa`) được kiểm trong `uv run pytest` thường ngày bởi `tests/unit/test_agent_scenarios.py`, không cần LLM.
 

@@ -1,7 +1,8 @@
 """Mô hình ngôn ngữ của Agent: chọn nhà cung cấp bằng biến môi trường, gắn 6 tool (TD-20, TD-21).
 
-Mặc định OpenAI gpt-4o-mini; đổi sang Anthropic chỉ cần LLM_PROVIDER, LLM_MODEL. Đổi mô hình hoặc
-prompt thì chạy lại bộ kịch bản đánh giá trước khi lên production (docs mục 6.8).
+Mặc định DeepSeek-V4.1-Flash (`deepseek-flash`); đổi sang OpenAI hay Anthropic chỉ cần LLM_PROVIDER,
+LLM_MODEL. Đổi mô hình hoặc prompt thì chạy lại bộ kịch bản đánh giá trước khi lên production
+(docs mục 6.8).
 """
 
 from datetime import datetime
@@ -22,6 +23,7 @@ from app.modules.agent.tools import tool_specs
 
 ChatModel = Runnable[LanguageModelInput, BaseMessage]
 
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 MAX_OUTPUT_TOKENS = 800  # một câu trả lời của trợ lý đặt lịch không cần dài hơn
 TEMPERATURE = 0.2  # gọi tool ổn định, ít bịa
 _cache: dict[tuple[object, ...], ChatModel] = {}
@@ -61,6 +63,22 @@ def _bound(settings: Settings, model_name: str) -> ChatModel:
             max_tokens=MAX_OUTPUT_TOKENS,
         )
         return anthropic.bind_tools(specs, parallel_tool_calls=False)
+    if settings.llm_provider is LlmProvider.DEEPSEEK:
+        deepseek = ChatOpenAI(
+            model=model_name,
+            api_key=settings.llm_api_key,
+            base_url=DEEPSEEK_BASE_URL,
+            timeout=settings.llm_timeout_s,
+            max_retries=1,
+            temperature=TEMPERATURE,
+            max_tokens=MAX_OUTPUT_TOKENS,
+            stream_usage=True,
+            # Tắt suy luận (mặc định bật): ở chế độ đó, khi có tool, mọi lượt sau phải gửi lại
+            # reasoning_content, nếu không API trả 400; temperature cũng không còn tác dụng.
+            extra_body={"thinking": {"type": "disabled"}},
+        )
+        # DeepSeek không có tham số parallel_tool_calls; trần số tool mỗi bước nằm ở graph.py.
+        return deepseek.bind_tools(specs)
     openai = ChatOpenAI(
         model=model_name,
         api_key=settings.llm_api_key,
@@ -70,13 +88,13 @@ def _bound(settings: Settings, model_name: str) -> ChatModel:
         max_tokens=MAX_OUTPUT_TOKENS,
         stream_usage=True,  # số token nằm ở chunk cuối, dùng cho trần chi phí
     )
-    # Mỗi câu trả lời một tool (cả hai nhà cung cấp): tránh hai đề xuất song song.
+    # Mỗi câu trả lời một tool (OpenAI, Anthropic): tránh hai đề xuất song song.
     return openai.bind_tools(specs, parallel_tool_calls=False)
 
 
 def system_message(now: datetime, settings: Settings) -> SystemMessage:
     """Phần tĩnh trước, ngữ cảnh thời gian sau (docs mục 6.2). Anthropic cần đánh dấu chỗ lưu đệm;
-    OpenAI tự lưu đệm phần đầu giống nhau của prompt."""
+    OpenAI và DeepSeek tự lưu đệm phần đầu giống nhau của prompt."""
     static, dynamic = static_prompt(settings), time_context(now)
     if settings.llm_provider is LlmProvider.ANTHROPIC:
         return SystemMessage(

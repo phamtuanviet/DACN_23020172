@@ -204,7 +204,20 @@ def test_model_comes_from_settings_without_network() -> None:
     openai = Settings(**base, llm_api_key=SecretStr("sk-test"))
     first = build_chat_model(openai)
     assert first is not None and build_chat_model(openai) is first  # giữ client giữa các lượt
-    assert first.kwargs["parallel_tool_calls"] is False  # type: ignore[attr-defined]
+    # Mặc định DeepSeek: endpoint riêng, tắt suy luận, không gửi parallel_tool_calls (API không có).
+    deepseek = first.bound  # type: ignore[attr-defined]
+    assert openai.llm_provider is LlmProvider.DEEPSEEK and deepseek.model_name == "deepseek-flash"
+    assert deepseek.openai_api_base == "https://api.deepseek.com"
+    assert deepseek.extra_body == {"thinking": {"type": "disabled"}}
+    assert "parallel_tool_calls" not in first.kwargs  # type: ignore[attr-defined]
+    gpt = Settings(
+        **base,
+        llm_provider=LlmProvider.OPENAI,
+        llm_model="gpt-4o-mini",
+        llm_api_key=SecretStr("sk-test"),
+    )
+    bound_gpt = build_chat_model(gpt)
+    assert bound_gpt.kwargs["parallel_tool_calls"] is False  # type: ignore[union-attr]
     anthropic = Settings(
         **base,
         llm_provider=LlmProvider.ANTHROPIC,

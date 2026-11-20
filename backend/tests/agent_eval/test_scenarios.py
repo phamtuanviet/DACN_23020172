@@ -213,7 +213,7 @@ def eval_settings() -> Any:
     if real.llm_provider is LlmProvider.FAKE:
         return agent_settings(llm_provider=LlmProvider.FAKE)
     if real.llm_api_key is None:
-        pytest.skip("Cần LLM_API_KEY (hoặc OPENAI_API_KEY) trong môi trường để chạy kịch bản")
+        pytest.skip("Cần LLM_API_KEY trong môi trường để chạy kịch bản")
     return agent_settings(
         llm_provider=real.llm_provider,
         llm_model=real.llm_model,
